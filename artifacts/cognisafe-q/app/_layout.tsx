@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
@@ -11,11 +10,9 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { TripProvider } from '@/components/TripContext';
-import { usePathname, useRouter } from 'expo-router';
-import { useTrip } from '@/components/TripContext';
+import { TripProvider, useTrip } from '@/components/TripContext';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -34,7 +31,8 @@ function RootLayoutNav() {
   }, [pathname, router, status, tripActive]);
 
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="trip" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="alert" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
@@ -66,9 +64,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <TripProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
+              <RootLayoutNav />
             </GestureHandlerRootView>
           </TripProvider>
         </QueryClientProvider>

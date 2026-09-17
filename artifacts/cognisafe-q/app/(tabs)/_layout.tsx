@@ -1,135 +1,136 @@
+/**
+ * Tab Layout — Premium bottom navigation
+ * Light background with red active state, clean pill indicator
+ */
+
 import React from 'react';
-import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Tabs } from 'expo-router';
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { SymbolView } from 'expo-symbols';
 
-// IMPORTANT: iOS 26 uses NativeTabs for native tabs with liquid glass support.
-// NativeTabs intentionally does NOT use custom design tokens — liquid glass
-// is a system-level appearance provided by iOS and cannot be overridden.
-// Custom brand colors are applied only on the ClassicTabLayout path (older iOS / Android / web).
-function NativeTabLayout() {
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'house', selected: 'house.fill' }}
-        />
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="history">
-        <NativeTabs.Trigger.Icon sf={{ default: 'clock', selected: 'clock.fill' }} />
-        <NativeTabs.Trigger.Label>History</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="live">
-        <NativeTabs.Trigger.Icon sf={{ default: 'steeringwheel', selected: 'steeringwheel' }} />
-        <NativeTabs.Trigger.Label>Live Trip</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="contacts">
-        <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
-        <NativeTabs.Trigger.Label>Contacts</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
-        <NativeTabs.Trigger.Icon sf={{ default: 'slider.horizontal.3', selected: 'slider.horizontal.3' }} />
-        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
-
-function ClassicTabLayout() {
+export default function TabLayout() {
   const colors = useColors();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = useColorScheme() === 'dark';
   const isIOS = Platform.OS === 'ios';
-  const isWeb = Platform.OS === 'web';
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.text4,
         tabBarStyle: {
           position: 'absolute',
-          backgroundColor: isIOS ? 'transparent' : colors.background,
-          borderTopWidth: isWeb ? 1 : 0,
+          backgroundColor: isIOS ? 'transparent' : colors.card,
+          borderTopWidth: 1,
           borderTopColor: colors.border,
+          height: 84,
+          paddingBottom: 20,
+          paddingTop: 8,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
         },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={100}
+              intensity={80}
               tint={isDark ? 'dark' : 'light'}
               style={StyleSheet.absoluteFill}
             />
-          ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
-            />
           ) : null,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          letterSpacing: 0.2,
+        },
+        tabBarIconStyle: { marginBottom: -2 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
-            ) : (
-              <Feather name="home" size={22} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ color }) =>
-            isIOS ? <SymbolView name="clock" tintColor={color} size={24} /> : <Feather name="clock" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="home" color={color as string} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="live"
         options={{
           title: 'Live Trip',
-          tabBarIcon: ({ color }) =>
-            isIOS ? <SymbolView name="steeringwheel" tintColor={color} size={24} /> : <Feather name="activity" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="activity" color={color as string} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="clock" color={color as string} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="contacts"
         options={{
           title: 'Contacts',
-          tabBarIcon: ({ color }) =>
-            isIOS ? <SymbolView name="person.2" tintColor={color} size={24} /> : <Feather name="users" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="users" color={color as string} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color }) =>
-            isIOS ? <SymbolView name="slider.horizontal.3" tintColor={color} size={24} /> : <Feather name="sliders" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="sliders" color={color as string} focused={focused} />
+          ),
         }}
       />
     </Tabs>
   );
 }
 
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
+function TabIcon({
+  name,
+  color,
+  focused,
+}: {
+  name: React.ComponentProps<typeof Feather>['name'];
+  color: string;
+  focused: boolean;
+}) {
+  return (
+    <View style={[styles.tabIconWrap, focused && styles.tabIconActive]}>
+      <Feather name={name} size={22} color={color} />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  tabIconWrap: {
+    width: 40,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  tabIconActive: {
+    backgroundColor: '#FFF0F0',
+  },
+});
