@@ -1,0 +1,1291 @@
+AUTHENTICATION
+
+Add authentication BEFORE the main application.
+
+Screens:
+
+Splash
+Login
+Signup
+Forgot Password
+Main Application
+==================================================
+SIGNUP
+
+Create a polished Signup screen.
+
+Fields:
+
+Full Name
+Email
+Password
+Confirm Password
+Phone Number
+
+Button:
+
+CREATE ACCOUNT
+
+Use Amazon Cognito for authentication.
+
+After successful registration:
+
+show:
+
+"Account created successfully."
+
+Then navigate to Login.
+
+Do NOT store passwords locally.
+
+==================================================
+LOGIN
+
+Create:
+
+COGNISAFE-Q
+
+"Your intelligent driving safety companion"
+
+Fields:
+
+Email
+Password
+
+Button:
+
+LOGIN
+
+Links:
+
+Forgot Password?
+Create Account
+
+Use Cognito authentication.
+
+After successful login:
+
+store the authenticated session/token securely.
+
+Navigate to Home.
+
+Do not expose authentication tokens in the UI.
+
+==================================================
+FORGOT PASSWORD
+
+Use Cognito password reset flow.
+
+Screen:
+
+Reset Password
+
+Email
+
+SEND RESET CODE
+
+Then:
+
+Verification Code
+New Password
+Confirm Password
+
+RESET PASSWORD
+
+==================================================
+AUTHENTICATED APP
+
+Only authenticated users can access:
+
+Home
+Live Trip
+History
+Contacts
+Settings
+
+If the user is not authenticated:
+
+redirect to Login.
+
+==================================================
+USER PROFILE
+
+Store user profile information in DynamoDB.
+
+User object:
+
+{
+userId,
+fullName,
+email,
+phone,
+createdAt
+}
+
+Use the Cognito user ID as the unique user identifier.
+
+==================================================
+BOTTOM NAVIGATION
+
+Use Expo Router.
+
+Tabs:
+
+Home
+Live Trip
+History
+Contacts
+Settings
+
+Use a root navigation stack above the tabs for:
+
+Alert Screen
+Emergency Screen
+
+Alert and Emergency screens must cover the entire application,
+including the bottom tab navigation.
+
+==================================================
+HOME SCREEN
+
+Header:
+
+COGNISAFE-Q
+
+"Your intelligent driving safety companion"
+
+Display:
+
+Current Safety Status
+Current Speed
+Trip Status
+Safety Score
+Last Event
+
+Main safety card:
+
+SAFE
+
+"Monitoring ready"
+
+Status colors:
+
+SAFE:
+#22C55E
+
+ALERT:
+#F59E0B
+
+EMERGENCY:
+#EF4444
+
+Primary button:
+
+START TRIP
+
+Secondary:
+
+Emergency Contacts
+Trip History
+
+Show:
+
+DEMO MODE
+
+when demo mode is enabled.
+
+Also show:
+
+Logged in as:
+User Name
+
+==================================================
+LIVE TRIP
+
+When START TRIP is pressed:
+
+Request location permission.
+Initialize accelerometer.
+Initialize gyroscope.
+Start GPS.
+Start trip timer.
+Enable keep-awake.
+Start sensor buffering.
+Start inference processing.
+
+Display:
+
+COGNISAFE-Q
+
+SAFE
+
+Driving monitored
+
+Speed
+42 km/h
+
+Distance
+2.8 km
+
+Duration
+00:04:32
+
+SYSTEM STATUS
+
+Accelerometer ● Active
+Gyroscope ● Active
+GPS ● Active
+AI ● Active
+AWS ● Connected
+
+SOS
+
+Emergency
+
+STOP TRIP
+
+Keep this screen minimal and glanceable.
+
+==================================================
+SENSOR COLLECTION
+
+Use:
+
+expo-sensors
+
+Accelerometer
+Gyroscope
+
+Collect:
+
+ax
+ay
+az
+gx
+gy
+gz
+
+Represent every synchronized reading:
+
+[
+ax,
+ay,
+az,
+gx,
+gy,
+gz
+]
+
+Target approximately 50 Hz.
+
+Do not assume exact 50 Hz.
+
+==================================================
+SENSOR SYNCHRONIZATION
+
+Accelerometer and gyroscope produce separate streams.
+
+Synchronize using timestamps/latest readings.
+
+Do not blindly assume that the nth accelerometer event equals
+the nth gyroscope event.
+
+Create:
+
+SensorSample:
+
+{
+ax,
+ay,
+az,
+gx,
+gy,
+gz,
+timestamp
+}
+
+==================================================
+SLIDING WINDOW
+
+WINDOW_SIZE = 150
+
+STRIDE = 15
+
+Maintain an in-memory buffer.
+
+When:
+
+buffer.length >= 150
+
+create:
+
+150 × 6 window.
+
+Example:
+
+[
+[ax, ay, az, gx, gy, gz],
+[ax, ay, az, gx, gy, gz],
+...
+]
+
+Send the complete window to the inference service.
+
+After processing:
+
+remove first 15 samples.
+
+Window 1:
+
+1–150
+
+Window 2:
+
+16–165
+
+Window 3:
+
+31–180
+
+Never send individual sensor readings to the backend.
+
+==================================================
+INFERENCE SERVICE
+
+Create:
+
+src/services/inferenceService.ts
+
+Function:
+
+predictSensorWindow(
+window,
+sessionId
+)
+
+Create:
+
+USE_MOCK_AI
+
+Default:
+
+true
+
+When false:
+
+POST:
+
+/predict
+
+Request:
+
+{
+"sessionId": "...",
+"timestamp": "...",
+"window": [
+[ax, ay, az, gx, gy, gz]
+]
+}
+
+Expected:
+
+{
+"status": "SAFE",
+"confidence": 0.96
+}
+
+Backend API:
+
+https://<API_GATEWAY_URL>/predict
+
+Keep API URL in:
+
+src/config/api.ts
+
+==================================================
+AWS PREDICTION API
+
+API Gateway:
+
+POST /predict
+
+Lambda:
+
+predictionLambda
+
+Responsibilities:
+
+Validate authenticated user.
+Validate sessionId.
+Validate sensor window.
+Ensure window contains 150 rows.
+Ensure every row contains 6 values.
+Run the configured inference model.
+Return status and confidence.
+Log prediction event.
+
+Response:
+
+{
+"status": "SAFE | ALERT | EMERGENCY",
+"confidence": 0.0
+}
+
+For MVP, the Lambda may initially use a mock inference function
+if the trained model is not yet deployed.
+
+Keep the interface identical so the real ML model can replace
+the mock logic later.
+
+==================================================
+MOCK AI
+
+Mock AI must remain available.
+
+When Demo Mode is enabled:
+
+show:
+
+SIMULATE SAFE
+SIMULATE ALERT
+SIMULATE EMERGENCY
+
+These must trigger the exact same application state machine
+as real AI predictions.
+
+==================================================
+AI CONFIDENCE
+
+Display confidence in the alert interface.
+
+Example:
+
+AI CONFIDENCE
+
+89%
+
+Risk assessment indicates abnormal motion.
+
+Do not expose technical model details to the driver.
+
+==================================================
+ALERT FLOW
+
+When AI returns:
+
+ALERT
+
+Immediately open full-screen Alert screen.
+
+The screen covers:
+
+current screen
+bottom navigation
+all normal controls
+
+Display:
+
+⚠️
+
+UNUSUAL MOTION DETECTED
+
+"Are you okay?"
+
+AI Confidence
+89%
+
+Countdown:
+
+30
+
+SECONDS
+
+Message:
+
+"If you are safe, confirm below."
+
+Buttons:
+
+I'M OK
+
+SEND SOS NOW
+
+==================================================
+SOUND ALERT
+
+When ALERT starts:
+
+Play a prominent warning sound.
+
+The sound should clearly indicate that driver attention is
+required.
+
+Use a bundled local alert sound for reliability.
+
+Do not depend on streaming audio.
+
+The sound should stop when:
+
+I'M OK
+
+or
+
+Emergency flow begins.
+
+Provide Settings:
+
+Alert Sound
+ON/OFF
+
+Emergency Sound
+ON/OFF
+
+==================================================
+VIBRATION ALERT
+
+When ALERT begins:
+
+trigger haptic feedback.
+
+Use a repeating vibration pattern while the countdown is active.
+
+Example:
+
+vibrate
+pause
+vibrate
+pause
+
+Do not use continuous vibration that drains battery.
+
+When the driver presses I'M OK:
+
+stop vibration.
+
+==================================================
+EMERGENCY SOUND + VIBRATION
+
+When EMERGENCY is triggered:
+
+Use a stronger emergency sound.
+
+Trigger stronger haptic feedback.
+
+The emergency state must be visually obvious.
+
+Display:
+
+🚨 EMERGENCY ALERT
+
+"Emergency response has been activated."
+
+Location captured ✓
+
+Alert sent ✓
+
+==================================================
+COUNTDOWN
+
+Default:
+
+30 seconds.
+
+Every second:
+
+30
+29
+28
+27
+...
+
+If:
+
+I'M OK
+
+Then:
+
+stop sound
+stop vibration
+cancel countdown
+return to SAFE
+record ALERT event
+
+If countdown reaches:
+
+0
+
+Automatically trigger EMERGENCY.
+
+==================================================
+EMERGENCY FLOW
+
+Emergency can be triggered by:
+
+AI returns EMERGENCY
+ALERT countdown expires
+Manual SOS
+
+When triggered:
+
+Change status to EMERGENCY.
+Stop normal alert sound.
+Start emergency sound.
+Trigger emergency vibration.
+Obtain GPS location.
+Send emergency request to AWS.
+Display emergency confirmation.
+==================================================
+GPS
+
+Use:
+
+expo-location
+
+Request foreground location permission.
+
+Capture:
+
+latitude
+longitude
+accuracy
+timestamp
+speed
+
+Use GPS speed for the live speed display.
+
+If unavailable:
+
+display:
+
+-- km/h
+
+Do not use complex accelerometer integration for speed.
+
+==================================================
+EMERGENCY API
+
+POST:
+
+/alert
+
+Body:
+
+{
+"sessionId": "...",
+"userId": "...",
+"location": {
+"lat": 0,
+"lng": 0,
+"accuracy": 0
+},
+"timestamp": "..."
+}
+
+API Gateway
+↓
+Lambda
+↓
+DynamoDB
+↓
+SNS
+↓
+Emergency Contacts
+
+==================================================
+AWS SNS
+
+Lambda should publish an emergency notification through Amazon SNS.
+
+Notification should contain:
+
+COGNISAFE-Q EMERGENCY ALERT
+
+User:
+<name>
+
+An emergency event was detected during a trip.
+
+Location:
+<latitude>, <longitude>
+
+Time:
+<timestamp>
+
+For MVP:
+
+SNS integration should be implemented on the backend.
+
+Do not attempt to directly publish SNS messages from the mobile
+application.
+
+Never expose AWS credentials in the mobile app.
+
+==================================================
+EMERGENCY CONTACTS
+
+Users can:
+
+Add
+Edit
+Delete
+Set Primary Contact
+
+Fields:
+
+Name
+Phone
+Email
+
+Store contact information in DynamoDB.
+
+API:
+
+GET /contacts
+POST /contacts
+PUT /contacts/{contactId}
+DELETE /contacts/{contactId}
+
+Contacts are associated with:
+
+userId
+
+==================================================
+TRIP STORAGE
+
+Store trips in DynamoDB.
+
+Trip:
+
+{
+sessionId,
+userId,
+startTime,
+endTime,
+duration,
+distance,
+alertCount,
+emergencyTriggered
+}
+
+API:
+
+POST /trips
+GET /trips
+GET /trips/{sessionId}
+
+Only return trips belonging to the authenticated user.
+
+==================================================
+TRIP HISTORY
+
+Show:
+
+TRIP HISTORY
+
+17 Sep 2026
+
+32 min
+18.4 km
+
+Alerts:
+1
+
+Emergency:
+No
+
+Tap trip:
+
+show event timeline.
+
+Example:
+
+10:12
+Trip started
+
+10:18
+SAFE
+96%
+
+10:27
+ALERT
+89%
+
+Driver confirmed safety
+
+10:44
+Trip ended
+
+==================================================
+EVENT TIMELINE
+
+Record:
+
+TRIP_STARTED
+SAFE
+ALERT
+ALERT_DISMISSED
+EMERGENCY
+LOCATION_CAPTURED
+ALERT_SENT
+TRIP_ENDED
+
+Display them chronologically.
+
+==================================================
+SAFETY SCORE
+
+Display:
+
+Safety Score
+
+86 / 100
+
+Last 7 Days
+
+Trips
+12
+
+Distance
+186 km
+
+Alerts
+2
+
+Emergencies
+0
+
+Add a simple 7-day trend.
+
+For MVP:
+
+calculate a simple aggregate score.
+
+Do NOT claim that this is the exact research model calculation.
+
+==================================================
+WHY WAS I ALERTED?
+
+Create an explainable AI section.
+
+Example:
+
+WHY WAS I ALERTED?
+
+Stage 1
+Abnormal Motion
+HIGH
+
+Stage 2
+Behavior Analysis
+MODERATE
+
+Temporal Consistency
+HIGH
+
+AI Confidence
+91%
+
+Possible detected patterns:
+
+• Sudden acceleration
+• Abrupt rotational movement
+• Persistent abnormal motion
+
+This should communicate the research architecture in a
+simple driver-friendly way.
+
+==================================================
+OFFLINE BEHAVIOR
+
+If AWS is unavailable:
+
+Continue local sensor monitoring.
+
+Show:
+
+OFFLINE MODE
+
+"Sensor monitoring continues."
+
+Do not automatically classify network failure as EMERGENCY.
+
+If an ALERT was already received:
+
+continue the alert countdown locally.
+
+Emergency should still attempt GPS capture.
+
+Queue critical data locally where practical.
+
+==================================================
+LOCAL STORAGE
+
+Use AsyncStorage for:
+
+demo settings
+local fallback trip data
+pending events
+app preferences
+
+Do not store:
+
+passwords
+Cognito secrets
+sensitive authentication credentials
+
+Use secure authentication mechanisms provided by Cognito.
+
+==================================================
+DEMO MODE
+
+Demo Mode is essential.
+
+Controls:
+
+SIMULATE SAFE
+SIMULATE ALERT
+SIMULATE EMERGENCY
+
+Scenario 1:
+
+SAFE
+↓
+SIMULATE ALERT
+↓
+Sound + vibration
+↓
+ALERT
+↓
+30-second countdown
+↓
+I'M OK
+↓
+Sound stops
+↓
+Vibration stops
+↓
+SAFE
+
+Scenario 2:
+
+SAFE
+↓
+SIMULATE ALERT
+↓
+Sound + vibration
+↓
+Countdown
+↓
+No response
+↓
+EMERGENCY
+↓
+Emergency sound
+↓
+Emergency vibration
+↓
+GPS
+↓
+AWS /alert
+↓
+Lambda
+↓
+SNS
+↓
+Emergency contact notification
+
+Scenario 3:
+
+SAFE
+↓
+SOS
+↓
+Confirmation
+↓
+EMERGENCY
+↓
+GPS
+↓
+AWS
+↓
+SNS
+
+==================================================
+SETTINGS
+
+Create:
+
+Settings
+
+Account
+Profile
+
+Safety:
+
+Alert Sound
+ON/OFF
+
+Emergency Sound
+ON/OFF
+
+Vibration
+ON/OFF
+
+Alert Countdown
+30 seconds
+
+Notifications
+ON/OFF
+
+Developer:
+
+Demo Mode
+ON/OFF
+
+Mock AI
+ON/OFF
+
+AWS API Endpoint
+
+System:
+
+Location Permission
+Sensor Status
+Network Status
+
+Logout
+
+==================================================
+LOGOUT
+
+Logout should:
+
+Clear authenticated session.
+Stop active monitoring.
+Disable keep-awake.
+Navigate to Login.
+
+If a trip is active:
+
+show confirmation:
+
+"End current trip before logging out?"
+
+==================================================
+KEEP AWAKE
+
+Use:
+
+expo-keep-awake
+
+When trip starts:
+
+keep screen awake.
+
+When trip ends:
+
+release keep-awake.
+
+==================================================
+NOTIFICATIONS
+
+Use expo-notifications for local application notifications where
+appropriate.
+
+Create notification categories for:
+
+ALERT
+EMERGENCY
+
+Do not rely exclusively on push notifications for the immediate
+on-screen alert.
+
+The active trip alert must work locally in the app.
+
+==================================================
+SECURITY
+
+IMPORTANT:
+
+Never put AWS access keys, secret keys or SNS credentials inside
+the mobile app.
+
+The mobile application communicates with:
+
+Cognito
+API Gateway
+
+AWS Lambda handles privileged operations.
+
+Use authenticated API requests.
+
+Every backend request must validate the authenticated user.
+
+Users must only be able to access their own:
+
+trips
+events
+contacts
+profile
+
+==================================================
+ERROR HANDLING
+
+Never crash because of:
+
+sensor unavailable
+GPS permission denied
+GPS unavailable
+API timeout
+AWS unavailable
+malformed response
+authentication failure
+notification permission denied
+sound unavailable
+vibration unavailable
+
+Provide graceful fallback states.
+
+==================================================
+DESIGN
+
+Use a premium dark safety-oriented interface.
+
+Status colors:
+
+SAFE:
+#22C55E
+
+ALERT:
+#F59E0B
+
+EMERGENCY:
+#EF4444
+
+Use:
+
+large status indicators
+large touch targets
+rounded cards
+high contrast
+subtle animations
+clear typography
+minimal live-trip information
+
+Avoid dense dashboards.
+
+==================================================
+EMERGENCY VISUAL DESIGN
+
+ALERT:
+
+amber interface
+
+⚠️
+UNUSUAL MOTION DETECTED
+
+countdown prominently displayed.
+
+EMERGENCY:
+
+red interface
+
+🚨
+EMERGENCY ACTIVE
+
+Use strong but professional animation.
+
+Do not make the interface visually confusing.
+
+==================================================
+PROJECT PRIORITIES
+
+Priority 1:
+
+Authentication
+
+Priority 2:
+
+Start Trip
+
+Priority 3:
+
+Accelerometer + Gyroscope
+
+Priority 4:
+
+150 × 6 sensor windows
+
+Priority 5:
+
+AI inference
+
+Priority 6:
+
+ALERT countdown
+
+Priority 7:
+
+Sound
+
+Priority 8:
+
+Vibration
+
+Priority 9:
+
+GPS
+
+Priority 10:
+
+Emergency flow
+
+Priority 11:
+
+AWS API Gateway + Lambda
+
+Priority 12:
+
+DynamoDB
+
+Priority 13:
+
+SNS
+
+Priority 14:
+
+Emergency Contacts
+
+Priority 15:
+
+Trip History
+
+Priority 16:
+
+Safety Score
+
+Priority 17:
+
+Explainable AI
+
+Priority 18:
+
+Demo Mode
+
+==================================================
+DO NOT IMPLEMENT
+
+Do NOT implement:
+
+payments
+social networking
+vehicle OBD
+Bluetooth vehicle hardware
+real ambulance dispatch integration
+complex maps
+unnecessary authentication providers
+complicated analytics
+unnecessary cloud services
+production-grade background execution
+
+unless explicitly requested later.

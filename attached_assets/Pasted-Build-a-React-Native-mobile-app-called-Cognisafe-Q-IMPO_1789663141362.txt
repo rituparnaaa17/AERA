@@ -1,0 +1,139 @@
+Build a React Native mobile app called "Cognisafe-Q".
+
+IMPORTANT:
+This is a 3-day hackathon MVP.
+
+The application must be built using React Native + Expo + TypeScript.
+
+Prioritize:
+1. Working end-to-end functionality
+2. AWS integration
+3. Reliable emergency detection flow
+4. Sound and vibration alerts
+5. Authentication
+6. Polished UI
+7. Demo reliability
+
+Do NOT use Flutter or Dart.
+
+==================================================
+PRODUCT
+==================================================
+
+Cognisafe-Q is a smartphone-based vehicular safety and emergency
+response application.
+
+The application monitors:
+
+- Accelerometer
+- Gyroscope
+- GPS
+
+It processes sensor readings into:
+
+150 × 6 temporal windows
+
+with:
+
+STRIDE = 15
+
+The inference layer determines:
+
+SAFE
+ALERT
+EMERGENCY
+
+The application uses:
+
+Sensor Detection
+→ AI Inference
+→ Risk Assessment
+→ Driver Confirmation
+→ Emergency Escalation
+→ GPS Location
+→ Emergency Notification
+
+The research concept includes abnormal motion detection,
+behavioral refinement, temporal consistency, confidence-aware
+decision making, user confirmation and automatic emergency
+escalation.
+
+==================================================
+TECH STACK
+==================================================
+
+MOBILE:
+
+- React Native
+- Expo
+- TypeScript
+- Expo Router
+- expo-sensors
+- expo-location
+- expo-keep-awake
+- expo-notifications
+- expo-haptics
+- @react-native-async-storage/async-storage
+- fetch
+- React Context or Zustand
+
+AUTHENTICATION:
+
+- AWS Cognito
+
+BACKEND:
+
+- Amazon API Gateway
+- AWS Lambda
+- Amazon DynamoDB
+- Amazon SNS
+
+OPTIONAL:
+
+- Amazon S3 for larger sensor/event data
+- Amazon CloudWatch for backend logs
+
+Do not add unnecessary AWS services.
+
+==================================================
+AWS ARCHITECTURE
+==================================================
+
+Use this architecture:
+
+React Native App
+       |
+       | HTTPS
+       ▼
+Amazon API Gateway
+       |
+       ▼
+AWS Lambda
+       |
+       ├── Prediction Logic
+       ├── Trip Management
+       ├── Contact Management
+       └── Emergency Alert Logic
+       |
+       ▼
+Amazon DynamoDB
+
+Emergency:
+
+Lambda
+  |
+  ▼
+Amazon SNS
+  |
+  ├── Emergency Contact
+  └── Optional Emergency Notification
+
+Authentication:
+
+React Native
+     |
+     ▼
+Amazon Cognito
+     |
+     ▼
+Authenticated API requests
