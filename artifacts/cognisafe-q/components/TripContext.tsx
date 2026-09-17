@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Accelerometer, Gyroscope } from 'expo-sensors';
+import { useKeepAwake } from 'expo-keep-awake';
 import React, {
   createContext,
   PropsWithChildren,
@@ -12,6 +12,13 @@ import React, {
   useState,
 } from 'react';
 import { Platform } from 'react-native';
+import { sendEmergencyAlert } from '@/services/alertService';
+import { syncContact } from '@/services/contactService';
+import { getEmergencyLocation } from '@/services/locationService';
+import { predictSensorWindow, simulatePrediction, PredictionStatus } from '@/services/inferenceService';
+import { DEFAULT_COUNTDOWN_SECONDS } from '@/utils/constants';
+import { SensorWindowBuffer } from '@/services/sensorService';
+import { loadStoredState, saveStoredState } from '@/services/storageService';
 
 export type SafetyStatus = 'SAFE' | 'ALERT' | 'EMERGENCY';
 
@@ -30,6 +37,9 @@ export type Trip = {
   distance: number;
   hadAlert: boolean;
   events: TripEvent[];
+  alertCount?: number;
+  emergencyTriggered?: boolean;
+  safeWindows?: number;
 };
 
 export type Contact = {
@@ -42,6 +52,8 @@ export type Contact = {
 type AppSettings = {
   notifyEmergencyServices: boolean;
   countdownSeconds: number;
+  demoMode: boolean;
+  mockAi: boolean;
 };
 
 type TripContextValue = {
@@ -71,43 +83,26 @@ type TripContextValue = {
   removeContact: (id: string) => Promise<void>;
   setNotifyEmergencyServices: (value: boolean) => Promise<void>;
   setCountdownSeconds: (value: number) => Promise<void>;
+  setDemoMode: (value: boolean) => Promise<void>;
+  setMockAi: (value: boolean) => Promise<void>;
   refreshPermission: () => Promise<void>;
-};
-
-const STORAGE_KEYS = {
-  trips: '@cognisafe/trips',
-  contacts: '@cognisafe/contacts',
-  settings: '@cognisafe/settings',
+  simulateStatus: (status: PredictionStatus) => Promise<void>;
+  windowsProcessed: number;
+  networkAvailable: boolean;
+  lastEventLabel: string;
+  lastCompletedTrip: Trip | null;
+  dismissCompletedTrip: () => void;
 };
 
 const defaultSettings: AppSettings = {
   notifyEmergencyServices: true,
-  countdownSeconds: 30,
+  countdownSeconds: DEFAULT_COUNTDOWN_SECONDS,
+  demoMode: true,
+  mockAi: true,
 };
 
 const createId = () =>
   `${Date.now().toString()}-${Math.random().toString(36).slice(2, 9)}`;
-
-const apiBase = () =>
-  typeof process !== 'undefined'
-    ? process.env.EXPO_PUBLIC_API_GATEWAY_URL
-    : undefined;
-
-async function postJson(path: string, body: unknown) {
-  const base = apiBase();
-  if (!base) return null;
-  try {
-    const response = await fetch(`${base.replace(/\/$/, '')}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) return null;
-    return (await response.json()) as { status?: SafetyStatus; confidence?: number };
-  } catch {
-    return null;
-  }
-}
 
 const TripContext = createContext<TripContextValue | null>(null);
 
@@ -130,13 +125,17 @@ export function TripProvider({ children }: PropsWithChildren) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [tripEvents, setTripEvents] = useState<TripEvent[]>([]);
+  const [windowsProcessed, setWindowsProcessed] = useState(0);
+  const [networkAvailable, setNetworkAvailable] = useState(true);
+  const [lastCompletedTrip, setLastCompletedTrip] = useState<Trip | null>(null);
 
-  const sensorBuffer = useRef<number[][]>([]);
-  const latestAcceleration = useRef({ x: 0, y: 0, z: 0 });
-  const latestRotation = useRef({ x: 0, y: 0, z: 0 });
+  const sensorBuffer = useRef(new SensorWindowBuffer());
+  const latestAcceleration = useRef({ x: 0, y: 0, z: 0, timestamp: 0 });
+  const latestRotation = useRef({ x: 0, y: 0, z: 0, timestamp: 0 });
   const previousLocation = useRef<{ lat: number; lng: number } | null>(null);
   const statusRef = useRef(status);
   const sessionRef = useRef(sessionId);
+  useKeepAwake(tripActive ? 'cognisafe-trip' : undefined);
 
   useEffect(() => {
     statusRef.current = status;
@@ -145,14 +144,10 @@ export function TripProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const load = async () => {
-      const [storedTrips, storedContacts, storedSettings] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.trips),
-        AsyncStorage.getItem(STORAGE_KEYS.contacts),
-        AsyncStorage.getItem(STORAGE_KEYS.settings),
-      ]);
-      if (storedTrips) setTrips(JSON.parse(storedTrips) as Trip[]);
-      if (storedContacts) setContacts(JSON.parse(storedContacts) as Contact[]);
-      if (storedSettings) setSettings({ ...defaultSettings, ...JSON.parse(storedSettings) });
+      const stored = await loadStoredState();
+      setTrips(stored.trips);
+      setContacts(stored.contacts);
+      setSettings({ ...defaultSettings, ...stored.settings });
       setHydrated(true);
     };
     void load();
@@ -160,11 +155,7 @@ export function TripProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!hydrated) return;
-    void Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.trips, JSON.stringify(trips)),
-      AsyncStorage.setItem(STORAGE_KEYS.contacts, JSON.stringify(contacts)),
-      AsyncStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings)),
-    ]);
+    void saveStoredState({ trips, contacts, settings });
   }, [hydrated, trips, contacts, settings]);
 
   const addEvent = useCallback((eventStatus: TripEvent['status'], label: string) => {
@@ -173,6 +164,8 @@ export function TripProvider({ children }: PropsWithChildren) {
       { id: createId(), status: eventStatus, timestamp: new Date().toISOString(), label },
     ]);
   }, []);
+
+  const lastEventLabel = tripEvents[tripEvents.length - 1]?.label ?? 'Monitoring ready';
 
   const refreshPermission = useCallback(async () => {
     if (Platform.OS === 'web') {
@@ -206,6 +199,9 @@ export function TripProvider({ children }: PropsWithChildren) {
     setConfidence(null);
     setEmergencySent(false);
     setCancelUntil(null);
+    setLastCompletedTrip(null);
+    setWindowsProcessed(0);
+    setNetworkAvailable(true);
     setTripEvents([
       {
         id: createId(),
@@ -214,7 +210,7 @@ export function TripProvider({ children }: PropsWithChildren) {
         label: 'Trip started',
       },
     ]);
-    sensorBuffer.current = [];
+    sensorBuffer.current.clear();
     previousLocation.current = null;
     setTripActive(true);
     return true;
@@ -230,8 +226,12 @@ export function TripProvider({ children }: PropsWithChildren) {
       distance: distanceKm,
       hadAlert: tripEvents.some((event) => event.status === 'ALERT' || event.status === 'EMERGENCY'),
       events: tripEvents,
+      alertCount: tripEvents.filter((event) => event.status === 'ALERT').length,
+      emergencyTriggered: tripEvents.some((event) => event.status === 'EMERGENCY'),
+      safeWindows: windowsProcessed,
     };
     setTrips((current) => [nextTrip, ...current].slice(0, 30));
+    setLastCompletedTrip(nextTrip);
     setTripActive(false);
     setSessionId(null);
     setTripStartedAt(null);
@@ -240,26 +240,19 @@ export function TripProvider({ children }: PropsWithChildren) {
     setAlertSecondsLeft(0);
     setEmergencySent(false);
     setCancelUntil(null);
-    sensorBuffer.current = [];
-  }, [distanceKm, elapsedSeconds, sessionId, tripActive, tripEvents, tripStartedAt]);
+    sensorBuffer.current.clear();
+  }, [distanceKm, elapsedSeconds, sessionId, tripActive, tripEvents, tripStartedAt, windowsProcessed]);
 
   const sendEmergency = useCallback(async () => {
     if (!sessionRef.current) return;
-    let location: { lat: number; lng: number } | null = previousLocation.current;
-    if (Platform.OS !== 'web') {
-      try {
-        const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        location = { lat: current.coords.latitude, lng: current.coords.longitude };
-      } catch {
-        location = previousLocation.current;
-      }
-    }
-    await postJson('/alert', {
+    const location = Platform.OS === 'web' ? previousLocation.current : await getEmergencyLocation() ?? previousLocation.current;
+    await sendEmergencyAlert({
       sessionId: sessionRef.current,
       location,
       timestamp: new Date().toISOString(),
       notifyEmergencyServices: settings.notifyEmergencyServices,
     });
+    setNetworkAvailable(true);
     setStatus('EMERGENCY');
     setEmergencySent(true);
     setCancelUntil(Date.now() + 8000);
@@ -301,19 +294,25 @@ export function TripProvider({ children }: PropsWithChildren) {
 
   const handleSensorSample = useCallback(
     (acceleration: { x: number; y: number; z: number }, rotation: { x: number; y: number; z: number }) => {
-      const sample = [acceleration.x, acceleration.y, acceleration.z, rotation.x, rotation.y, rotation.z];
-      sensorBuffer.current.push(sample);
-      if (sensorBuffer.current.length >= 150) {
-        const window = sensorBuffer.current.slice(-150);
-        sensorBuffer.current = sensorBuffer.current.slice(-135);
-        void postJson('/predict', {
-          sessionId: sessionRef.current,
-          timestamp: new Date().toISOString(),
-          window,
-        }).then((result) => {
-          if (!result) return;
-          if (result.confidence !== undefined) setConfidence(result.confidence);
-          if (result.status === 'ALERT') triggerAlert('Abnormal motion detected', result.confidence ?? 0.9);
+      const windows = sensorBuffer.current.push({
+        ax: acceleration.x,
+        ay: acceleration.y,
+        az: acceleration.z,
+        gx: rotation.x,
+        gy: rotation.y,
+        gz: rotation.z,
+        timestamp: Date.now(),
+      });
+      for (const window of windows) {
+        setWindowsProcessed((current) => current + 1);
+        void predictSensorWindow(window, sessionRef.current ?? '', settings.mockAi).then((result) => {
+          if (!result) {
+            setNetworkAvailable(false);
+            return;
+          }
+          setNetworkAvailable(true);
+          setConfidence(result.confidence);
+          if (result.status === 'ALERT') triggerAlert('Abnormal motion detected', result.confidence);
           if (result.status === 'EMERGENCY') void sendEmergency();
         });
       }
@@ -323,7 +322,7 @@ export function TripProvider({ children }: PropsWithChildren) {
         triggerAlert('Sudden motion detected', 0.94);
       }
     },
-    [sendEmergency, triggerAlert],
+    [sendEmergency, settings.mockAi, triggerAlert],
   );
 
   useEffect(() => {
@@ -331,11 +330,13 @@ export function TripProvider({ children }: PropsWithChildren) {
     Accelerometer.setUpdateInterval(20);
     Gyroscope.setUpdateInterval(20);
     const accelerationSubscription = Accelerometer.addListener((data) => {
-      latestAcceleration.current = data;
-      handleSensorSample(latestAcceleration.current, latestRotation.current);
+      latestAcceleration.current = { ...data, timestamp: Date.now() };
+      if (latestAcceleration.current.timestamp - latestRotation.current.timestamp < 100) {
+        handleSensorSample(latestAcceleration.current, latestRotation.current);
+      }
     });
     const gyroscopeSubscription = Gyroscope.addListener((data) => {
-      latestRotation.current = data;
+      latestRotation.current = { ...data, timestamp: Date.now() };
     });
     return () => {
       accelerationSubscription.remove();
@@ -395,17 +396,36 @@ export function TripProvider({ children }: PropsWithChildren) {
 
   const triggerManualSos = useCallback(async () => {
     if (!tripActive) return;
-    setStatus('EMERGENCY');
     addEvent('EMERGENCY', 'Manual SOS triggered');
     await sendEmergency();
   }, [addEvent, sendEmergency, tripActive]);
 
+  const simulateStatus = useCallback(
+    async (nextStatus: PredictionStatus) => {
+      if (!tripActive) return;
+      const result = await simulatePrediction(nextStatus);
+      setConfidence(result.confidence);
+      if (result.status === 'SAFE') {
+        setStatus('SAFE');
+        setAlertExpiresAt(null);
+        setAlertSecondsLeft(0);
+        addEvent('SAFE', 'Demo: simulated safe window');
+      }
+      if (result.status === 'ALERT') triggerAlert('Demo: unusual motion detected', result.confidence);
+      if (result.status === 'EMERGENCY') await sendEmergency();
+    },
+    [addEvent, sendEmergency, triggerAlert, tripActive],
+  );
+
   const addContact = useCallback(async (contact: Omit<Contact, 'id'>) => {
-    setContacts((current) => [...current, { ...contact, id: createId() }]);
+    const saved = { ...contact, id: createId() };
+    setContacts((current) => [...current, saved]);
+    void syncContact(saved);
   }, []);
 
   const updateContact = useCallback(async (contact: Contact) => {
     setContacts((current) => current.map((item) => (item.id === contact.id ? contact : item)));
+    void syncContact(contact);
   }, []);
 
   const removeContact = useCallback(async (id: string) => {
@@ -419,6 +439,16 @@ export function TripProvider({ children }: PropsWithChildren) {
   const setCountdownSeconds = useCallback(async (value: number) => {
     setSettings((current) => ({ ...current, countdownSeconds: value }));
   }, []);
+
+  const setDemoMode = useCallback(async (value: boolean) => {
+    setSettings((current) => ({ ...current, demoMode: value }));
+  }, []);
+
+  const setMockAi = useCallback(async (value: boolean) => {
+    setSettings((current) => ({ ...current, mockAi: value }));
+  }, []);
+
+  const dismissCompletedTrip = useCallback(() => setLastCompletedTrip(null), []);
 
   const value = useMemo<TripContextValue>(
     () => ({
@@ -448,7 +478,15 @@ export function TripProvider({ children }: PropsWithChildren) {
       removeContact,
       setNotifyEmergencyServices,
       setCountdownSeconds,
+      setDemoMode,
+      setMockAi,
       refreshPermission,
+      simulateStatus,
+      windowsProcessed,
+      networkAvailable,
+      lastEventLabel,
+      lastCompletedTrip,
+      dismissCompletedTrip,
     }),
     [
       acknowledgeOk,
@@ -476,8 +514,16 @@ export function TripProvider({ children }: PropsWithChildren) {
       cancelUntil,
       removeContact,
       setCountdownSeconds,
+      setDemoMode,
+      setMockAi,
       setNotifyEmergencyServices,
       updateContact,
+      simulateStatus,
+      windowsProcessed,
+      networkAvailable,
+      lastEventLabel,
+      lastCompletedTrip,
+      dismissCompletedTrip,
     ],
   );
 

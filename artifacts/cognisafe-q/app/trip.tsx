@@ -48,7 +48,7 @@ export default function TripScreen() {
           onPress={() =>
             Alert.alert('End this trip?', 'Your trip will be saved to history.', [
               { text: 'Keep driving', style: 'cancel' },
-              { text: 'End trip', style: 'destructive', onPress: async () => { await stopTrip(); router.replace('/'); } },
+              { text: 'End trip', style: 'destructive', onPress: async () => { await stopTrip(); router.replace('/summary'); } },
             ])
           }
           style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -99,11 +99,21 @@ export default function TripScreen() {
             </View>
           ) : (
             <>
-              <PrimaryButton icon="shield" variant="danger" onPress={() => void triggerManualSos()} testID="manual-sos">SOS — I need help</PrimaryButton>
+              <PrimaryButton
+                icon="shield"
+                variant="danger"
+                onPress={() => Alert.alert('Trigger emergency alert?', 'This will notify your response circle now.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Send SOS', style: 'destructive', onPress: () => void triggerManualSos() },
+                ])}
+                testID="manual-sos"
+              >
+                SOS — I need help
+              </PrimaryButton>
               <Pressable
                 onPress={() => Alert.alert('End this trip?', 'Your trip will be saved to history.', [
                   { text: 'Keep driving', style: 'cancel' },
-                  { text: 'End trip', style: 'destructive', onPress: async () => { await stopTrip(); router.replace('/'); } },
+                  { text: 'End trip', style: 'destructive', onPress: async () => { await stopTrip(); router.replace('/summary'); } },
                 ])}
                 style={styles.endButton}
               >

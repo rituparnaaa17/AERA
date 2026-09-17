@@ -27,7 +27,7 @@ const colors = {
     cardForeground: '#F4F7F8',
 
     // Primary action color (buttons, links, active states)
-    primary: '#54D6C7',
+    primary: '#22C55E',
     primaryForeground: '#071416',
 
     // Secondary / less-emphasis interactive surfaces
@@ -43,10 +43,10 @@ const colors = {
     accentForeground: '#B1FFF4',
 
     // Attention state (sensor anomaly / check-in countdown)
-    warning: '#F5B85C',
+    warning: '#F59E0B',
 
     // Destructive actions (delete, error states)
-    destructive: '#F06463',
+    destructive: '#EF4444',
     destructiveForeground: '#FFFFFF',
 
     // Borders and input outlines

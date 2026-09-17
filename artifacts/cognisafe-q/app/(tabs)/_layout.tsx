@@ -25,6 +25,10 @@ function NativeTabLayout() {
         <NativeTabs.Trigger.Icon sf={{ default: 'clock', selected: 'clock.fill' }} />
         <NativeTabs.Trigger.Label>History</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="live">
+        <NativeTabs.Trigger.Icon sf={{ default: 'steeringwheel', selected: 'steeringwheel' }} />
+        <NativeTabs.Trigger.Label>Live Trip</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="contacts">
         <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
         <NativeTabs.Trigger.Label>Contacts</NativeTabs.Trigger.Label>
@@ -93,6 +97,14 @@ function ClassicTabLayout() {
           title: 'History',
           tabBarIcon: ({ color }) =>
             isIOS ? <SymbolView name="clock" tintColor={color} size={24} /> : <Feather name="clock" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="live"
+        options={{
+          title: 'Live Trip',
+          tabBarIcon: ({ color }) =>
+            isIOS ? <SymbolView name="steeringwheel" tintColor={color} size={24} /> : <Feather name="activity" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

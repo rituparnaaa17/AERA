@@ -52,6 +52,16 @@ export default function HistoryScreen() {
             <Feather name="trending-up" size={19} color={colors.primary} />
             <Text style={[styles.summaryText, { color: colors.foreground }]}>Your recent drives are looking good.</Text>
           </View>
+          <View style={[styles.scoreCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.scoreHeader}><View><Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>SAFETY SCORE</Text><Text style={[styles.scoreValue, { color: colors.primary }]}>{Math.max(72, Math.round((trips.filter((trip) => !trip.hadAlert).length / trips.length) * 100))}<Text style={[styles.scoreUnit, { color: colors.mutedForeground }]}> / 100</Text></Text></View><Text style={[styles.scorePeriod, { color: colors.mutedForeground }]}>LAST 7 DAYS</Text></View>
+            <View style={styles.chart}>
+              {Array.from({ length: 7 }).map((_, index) => {
+                const trip = trips[6 - index];
+                const barHeight = trip ? (trip.hadAlert ? 48 : 82) : 26;
+                return <View key={index} style={styles.chartColumn}><View style={[styles.chartBar, { height: barHeight, backgroundColor: trip?.hadAlert ? colors.warning : trip ? colors.primary : colors.muted }]} /><Text style={[styles.chartDay, { color: colors.mutedForeground }]}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][index]}</Text></View>;
+              })}
+            </View>
+          </View>
           <View style={styles.list}>
             {trips.map((trip) => (
               <Pressable key={trip.id} onPress={() => setSelected(trip)} style={({ pressed }) => [styles.tripRow, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
@@ -101,4 +111,14 @@ const styles = StyleSheet.create({
   eventCopy: { flex: 1 },
   eventLabel: { fontSize: 14, fontWeight: '600', marginBottom: 3 },
   eventTime: { fontSize: 12 },
+  scoreCard: { borderRadius: 20, borderWidth: 1, padding: 17, marginBottom: 20 },
+  scoreHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  scoreLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.1, marginBottom: 5 },
+  scoreValue: { fontSize: 31, fontWeight: '700', letterSpacing: -1 },
+  scoreUnit: { fontSize: 13, letterSpacing: 0 },
+  scorePeriod: { fontSize: 10, fontWeight: '700', letterSpacing: 0.9 },
+  chart: { height: 108, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: 15 },
+  chartColumn: { flex: 1, alignItems: 'center', gap: 7 },
+  chartBar: { width: 15, borderRadius: 7 },
+  chartDay: { fontSize: 10, fontWeight: '700' },
 });

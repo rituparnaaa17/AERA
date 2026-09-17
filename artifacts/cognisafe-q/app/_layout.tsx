@@ -14,6 +14,8 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { TripProvider } from '@/components/TripContext';
+import { usePathname, useRouter } from 'expo-router';
+import { useTrip } from '@/components/TripContext';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -21,10 +23,23 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { status, tripActive } = useTrip();
+
+  useEffect(() => {
+    if (!tripActive) return;
+    if (status === 'ALERT' && pathname !== '/alert') router.replace('/alert');
+    if (status === 'EMERGENCY' && pathname !== '/emergency') router.replace('/emergency');
+  }, [pathname, router, status, tripActive]);
+
   return (
     <Stack screenOptions={{ headerBackTitle: 'Back' }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="trip" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="alert" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
+      <Stack.Screen name="emergency" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
+      <Stack.Screen name="summary" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </Stack>
   );
 }

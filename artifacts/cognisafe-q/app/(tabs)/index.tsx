@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -16,7 +16,8 @@ const formatDuration = (seconds: number) => {
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { status, tripActive, trips, contacts, startTrip, permissionGranted, hydrated } = useTrip();
+  const { status, tripActive, trips, contacts, startTrip, permissionGranted, hydrated, settings, lastEventLabel } = useTrip();
+  const [placementConfirmed, setPlacementConfirmed] = useState(false);
   const recentTrip = trips[0];
   const safeWindows = trips.reduce((total, trip) => total + (trip.hadAlert ? 0 : 1), 0);
   const score = trips.length ? Math.max(72, Math.round((safeWindows / trips.length) * 100)) : 96;
@@ -40,13 +41,14 @@ export default function HomeScreen() {
           </Pressable>
         }
       />
+      <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Your intelligent driving safety companion</Text>
 
       <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.heroTop}>
           <View>
             <Text style={[styles.heroLabel, { color: colors.mutedForeground }]}>CURRENT STATUS</Text>
             <Text style={[styles.heroStatus, { color: status === 'SAFE' ? colors.primary : status === 'ALERT' ? colors.warning : colors.destructive }]}>
-              {status === 'SAFE' ? 'All clear' : status === 'ALERT' ? 'Check in now' : 'Help is on the way'}
+              {status === 'SAFE' ? 'SAFE' : status === 'ALERT' ? 'ALERT' : 'EMERGENCY'}
             </Text>
           </View>
           <StatusPill status={status} />
@@ -55,9 +57,24 @@ export default function HomeScreen() {
           <View style={[styles.signalCore, { backgroundColor: status === 'SAFE' ? colors.primary : status === 'ALERT' ? colors.warning : colors.destructive }]} />
           <View style={[styles.signalRing, { borderColor: status === 'SAFE' ? colors.primary : status === 'ALERT' ? colors.warning : colors.destructive }]} />
         </View>
+        {settings.demoMode ? (
+          <View style={[styles.demoPill, { backgroundColor: colors.accent }]}>
+            <View style={[styles.demoDot, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.demoText, { color: colors.primary }]}>DEMO MODE</Text>
+          </View>
+        ) : null}
         <Text style={[styles.heroDescription, { color: colors.mutedForeground }]}>
-          {tripActive ? 'Sensors are watching for sudden motion and changes in your drive.' : 'Start a trip when you’re ready. We’ll watch quietly in the background.'}
+          {tripActive ? 'Sensors are watching for sudden motion and changes in your drive.' : 'Monitoring ready. Start a trip when you’re ready.'}
         </Text>
+        <Text style={[styles.lastEvent, { color: colors.mutedForeground }]}>Last event · {lastEventLabel}</Text>
+        {!tripActive && !placementConfirmed ? (
+          <View style={[styles.placement, { backgroundColor: colors.accent }]}>
+            <View style={styles.placementHeader}><Feather name="smartphone" size={17} color={colors.primary} /><Text style={[styles.placementTitle, { color: colors.foreground }]}>Phone placement</Text></View>
+            <Text style={[styles.placementBody, { color: colors.mutedForeground }]}>For better detection:</Text>
+            {['Secure your phone', 'Keep it stable', 'Avoid holding it while driving', 'Use a consistent position'].map((tip) => <Text key={tip} style={[styles.placementTip, { color: colors.foreground }]}><Text style={{ color: colors.primary }}>✓ </Text>{tip}</Text>)}
+            <Pressable onPress={() => setPlacementConfirmed(true)} style={[styles.gotIt, { borderColor: colors.border }]}><Text style={[styles.gotItText, { color: colors.primary }]}>Got it</Text></Pressable>
+          </View>
+        ) : null}
         <PrimaryButton
           icon={tripActive ? 'activity' : 'play'}
           testID="trip-toggle"
@@ -69,7 +86,7 @@ export default function HomeScreen() {
             const started = await startTrip();
             if (started) router.push('/trip');
           }}
-          disabled={!hydrated}
+          disabled={!hydrated || (!tripActive && !placementConfirmed)}
         >
           {tripActive ? 'Open live trip' : 'Start trip'}
         </PrimaryButton>
@@ -148,6 +165,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { paddingHorizontal: 20 },
   iconButton: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  subtitle: { fontSize: 13, marginTop: -16, marginBottom: 22 },
   heroCard: { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   heroLabel: { fontSize: 11, letterSpacing: 1.2, fontWeight: '700', marginBottom: 8 },
@@ -156,6 +174,17 @@ const styles = StyleSheet.create({
   signalRing: { position: 'absolute', width: 84, height: 84, borderRadius: 42, borderWidth: 1, opacity: 0.35 },
   signalCore: { width: 34, height: 34, borderRadius: 17 },
   heroDescription: { textAlign: 'center', fontSize: 14, lineHeight: 21, marginBottom: 18 },
+  demoPill: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, marginTop: 20, marginBottom: 2 },
+  demoDot: { width: 6, height: 6, borderRadius: 3 },
+  demoText: { fontSize: 10, fontWeight: '700', letterSpacing: 1.1 },
+  lastEvent: { textAlign: 'center', fontSize: 11, marginTop: -7, marginBottom: 15 },
+  placement: { borderRadius: 16, padding: 13, marginBottom: 14 },
+  placementHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 7 },
+  placementTitle: { fontSize: 13, fontWeight: '700' },
+  placementBody: { fontSize: 12, marginBottom: 6 },
+  placementTip: { fontSize: 12, lineHeight: 20 },
+  gotIt: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 7, marginTop: 9 },
+  gotItText: { fontSize: 12, fontWeight: '700' },
   permission: { fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 12 },
   section: { marginTop: 28 },
   metricsCard: { borderRadius: 20, borderWidth: 1, flexDirection: 'row', padding: 18 },
