@@ -1,0 +1,49 @@
+Build a React Native (Expo) mobile app called "Cognisafe-Q" — a smartphone-based vehicular safety and emergency response app that detects abnormal driving/accident-like motion using the phone's accelerometer and gyroscope, and escalates to emergency contacts if the driver doesn't respond.
+
+CORE FUNCTIONALITY
+- On "Start Trip", continuously sample accelerometer + gyroscope at ~50Hz using expo-sensors (Accelerometer, Gyroscope).
+- Buffer readings into sliding windows of 150 samples (stride 15), each window a 150x6 array: [ax, ay, az, gx, gy, gz].
+- Every time a window is filled, POST it as JSON to a backend inference endpoint: POST https://<API_GATEWAY_URL>/predict with body { sessionId, timestamp, window: [[ax,ay,az,gx,gy,gz], ...] }.
+- The backend returns { status: "SAFE" | "ALERT" | "EMERGENCY", confidence: number }.
+- If status is "ALERT": show a full-screen confirmation modal with "I'm OK" button and a visible countdown timer (default 30s). If the user taps "I'm OK", dismiss and resume monitoring. If the timer expires with no response, trigger the EMERGENCY flow automatically.
+- If status is "EMERGENCY" (either directly from backend or via countdown expiry): get current GPS location (expo-location), and POST to https://<API_GATEWAY_URL>/alert with { sessionId, location: {lat, lng}, timestamp } — this triggers the backend's SNS notification to emergency contacts. Show an on-screen "Emergency alert sent" confirmation with an option to cancel within a few seconds if it was a false trigger.
+
+SCREENS
+1. Home / Dashboard
+   - Big status indicator: SAFE (green), ALERT (amber), EMERGENCY (red)
+   - Current speed (derived from GPS or accelerometer integration — approximate is fine)
+   - Start/Stop trip monitoring button
+   - Quick access to Emergency Contacts and Trip History
+
+2. Live Trip screen (shown while monitoring is active)
+   - Safety status banner
+   - Simple speed gauge or numeric speed display
+   - Elapsed trip time and distance
+   - Manual "SOS" button for the user to trigger an alert themselves at any time
+
+3. Trip History
+   - List of past trips (fetched from DynamoDB via a GET /trips?sessionId= endpoint), each showing date, duration, and whether any alerts occurred
+   - Tap a trip to see a simple timeline of SAFE/ALERT/EMERGENCY events during that trip
+
+4. Emergency Contacts
+   - Add/edit/remove contacts (name, phone, email) — store locally and sync to backend so Lambda knows who to notify via SNS
+   - Toggle for "notify emergency services" vs "notify contacts only"
+
+5. Safety Score
+   - Simple aggregate score (e.g. 0-100) computed from the ratio of SAFE vs ALERT windows across recent trips, shown as a trend over the last 7/30 days
+
+DESIGN
+- Minimal, high-contrast UI safe for glanceable use while driving — large text, no dense information during a live trip
+- Calm palette for SAFE state, clear escalation of color/urgency for ALERT and EMERGENCY states
+- Bottom tab navigation: Home, Trip History, Contacts, Settings
+
+TECHNICAL NOTES
+- Use expo-sensors for accelerometer/gyroscope, expo-location for GPS, and fetch/axios for API calls
+- Handle permissions gracefully (motion & location) with clear rationale prompts
+- Backend endpoints (already built separately on AWS — API Gateway + Lambda + DynamoDB + SNS):
+  - POST /predict — sensor window in, safety status out
+  - POST /alert — trigger emergency notification
+  - GET /trips — trip history
+  - POST /contacts, GET /contacts — manage emergency contacts
+- Keep networking resilient: if a /predict call fails (poor connectivity), don't crash — buffer and retry, and fail safe (never suppress an ALERT due to a network error)
+- This is a hackathon MVP: prioritize working sensor capture, the alert/countdown flow, and clean UI over exhaustive edge-case handling
