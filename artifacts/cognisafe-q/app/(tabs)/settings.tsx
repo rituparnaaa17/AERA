@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTrip } from '@/components/TripContext';
 import { useColors } from '@/hooks/useColors';
+import { GlassCard } from '@/components/AppPrimitives';
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -34,7 +35,7 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 110 }]}
       showsVerticalScrollIndicator={false}
     >
@@ -56,8 +57,8 @@ export default function SettingsScreen() {
         <SettingDivider colors={colors} />
         {/* Countdown */}
         <View style={styles.settingRow}>
-          <View style={[styles.settingIcon, { backgroundColor: '#FFF0F0' }]}>
-            <Feather name="clock" size={17} color={colors.primary} />
+          <View style={[styles.settingIcon, { backgroundColor: colors.brandBlueSubtle }]}>
+            <Feather name="clock" size={17} color={colors.brandBlue} />
           </View>
           <View style={styles.settingCopy}>
             <Text style={[styles.settingTitle, { color: colors.text1 }]}>Alert Countdown</Text>
@@ -71,8 +72,8 @@ export default function SettingsScreen() {
                 style={[
                   styles.pill,
                   {
-                    backgroundColor: settings.countdownSeconds === s ? colors.primary : colors.muted,
-                    borderColor: settings.countdownSeconds === s ? colors.primary : colors.border,
+                    backgroundColor: settings.countdownSeconds === s ? colors.brandBlue : colors.muted,
+                    borderColor: settings.countdownSeconds === s ? colors.brandBlue : colors.border,
                   },
                 ]}
               >
@@ -86,11 +87,11 @@ export default function SettingsScreen() {
       </SettingGroup>
 
       {/* ── Demo / Developer ── */}
-      <SettingGroup title="Demo & Developer" icon="cpu" iconBg="#FFF0F0" iconColor={colors.primary} colors={colors}>
+      <SettingGroup title="Demo & Developer" icon="cpu" iconBg={colors.brandBlueSubtle} iconColor={colors.brandBlue} colors={colors}>
         <SettingRow
           icon="play-circle"
-          iconBg="#FFF0F0"
-          iconColor={colors.primary}
+          iconBg={colors.brandBlueSubtle}
+          iconColor={colors.brandBlue}
           title="Demo Mode"
           body="Show simulation controls for presentations."
           value={settings.demoMode}
@@ -100,8 +101,8 @@ export default function SettingsScreen() {
         <SettingDivider colors={colors} />
         <SettingRow
           icon="cpu"
-          iconBg="#FFF0F0"
-          iconColor={colors.primary}
+          iconBg={colors.brandBlueSubtle}
+          iconColor={colors.brandBlue}
           title="Mock AI"
           body="Use simulated inference instead of AWS."
           value={settings.mockAi}
@@ -170,7 +171,7 @@ export default function SettingsScreen() {
           <View style={styles.accessRight}>
             <View style={[styles.accessDot, { backgroundColor: permissionGranted ? colors.safe : colors.warning }]} />
             <Pressable onPress={() => void refreshPermission()}>
-              <Text style={[styles.refreshText, { color: colors.primary }]}>Refresh</Text>
+              <Text style={[styles.refreshText, { color: colors.brandBlue }]}>Refresh</Text>
             </Pressable>
           </View>
         </View>
@@ -188,9 +189,9 @@ export default function SettingsScreen() {
       </SettingGroup>
 
       {/* ── About ── */}
-      <View style={[styles.aboutCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <GlassCard style={styles.aboutCard}>
         <Image
-          source={require('@/assets/images/logo.png')}
+          source={require('@/assets/images/cognisafe-icon.png')}
           style={styles.aboutLogo}
           resizeMode="contain"
         />
@@ -200,7 +201,7 @@ export default function SettingsScreen() {
         </Text>
         <View style={[styles.aboutDivider, { backgroundColor: colors.border }]} />
         <Text style={[styles.aboutVersion, { color: colors.text4 }]}>Hackathon MVP · v1.0 · React Native + Expo</Text>
-      </View>
+      </GlassCard>
     </ScrollView>
   );
 }
@@ -225,9 +226,9 @@ function SettingGroup({
         </View>
         <Text style={[styles.groupTitle, { color: colors.text2 }]}>{title}</Text>
       </View>
-      <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <GlassCard style={styles.groupCard} noPadding>
         {children}
-      </View>
+      </GlassCard>
     </View>
   );
 }
@@ -256,7 +257,7 @@ function SettingRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: colors.muted, true: colors.primary }}
+        trackColor={{ false: colors.muted, true: colors.brandBlue }}
         thumbColor="#FFFFFF"
         ios_backgroundColor={colors.muted}
       />
@@ -279,7 +280,7 @@ const styles = StyleSheet.create({
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 4 },
   groupIcon: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   groupTitle: { fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
-  groupCard: { borderRadius: 20, borderWidth: 1.5, overflow: 'hidden' },
+  groupCard: { overflow: 'hidden' },
 
   // Rows
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 15 },
@@ -313,8 +314,8 @@ const styles = StyleSheet.create({
   refreshText: { fontSize: 12, fontWeight: '700' },
 
   // About
-  aboutCard: { borderRadius: 22, borderWidth: 1.5, padding: 24, alignItems: 'center', gap: 6, marginTop: 10 },
-  aboutLogo: { width: 52, height: 52, marginBottom: 4 },
+  aboutCard: { padding: 24, alignItems: 'center', gap: 6, marginTop: 10 },
+  aboutLogo: { width: 72, height: 72, marginBottom: 6 },
   aboutName: { fontSize: 18, fontWeight: '800' },
   aboutTagline: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
   aboutDivider: { height: 1, width: '100%', marginVertical: 8 },

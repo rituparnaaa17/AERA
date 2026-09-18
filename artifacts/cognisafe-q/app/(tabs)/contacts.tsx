@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { EmptyState, PrimaryButton } from '@/components/AppPrimitives';
+import { EmptyState, PrimaryButton, GlassCard, IconButton } from '@/components/AppPrimitives';
 import { useTrip, Contact } from '@/components/TripContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -48,12 +48,11 @@ export default function ContactsScreen() {
 
   const priorityLabel = (idx: number) =>
     idx === 0 ? 'PRIMARY' : idx === 1 ? 'SECONDARY' : `#${idx + 1}`;
-  const priorityColor = (idx: number) =>
-    idx === 0 ? colors.primary : idx === 1 ? colors.warning : colors.text3;
+    idx === 0 ? colors.brandBlue : idx === 1 ? colors.warning : colors.text3;
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 110 }]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
@@ -65,12 +64,11 @@ export default function ContactsScreen() {
           <Text style={[styles.screenSub, { color: colors.text3 }]}>Your emergency response circle</Text>
         </View>
         {!adding && (
-          <Pressable
+          <IconButton
+            icon="plus"
             onPress={() => openForm()}
-            style={[styles.addBtn, { backgroundColor: colors.primary }]}
-          >
-            <Feather name="plus" size={20} color="#FFFFFF" />
-          </Pressable>
+            variant="primary"
+          />
         )}
       </View>
 
@@ -86,10 +84,10 @@ export default function ContactsScreen() {
 
       {/* ── Add / Edit Form ── */}
       {adding && (
-        <View style={[styles.form, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <GlassCard style={styles.form}>
           <View style={styles.formHeader}>
-            <View style={[styles.formIconWrap, { backgroundColor: '#FFF0F0' }]}>
-              <Feather name="user-plus" size={20} color={colors.primary} />
+            <View style={[styles.formIconWrap, { backgroundColor: colors.brandBlueSubtle }]}>
+              <Feather name="user-plus" size={20} color={colors.brandBlue} />
             </View>
             <View>
               <Text style={[styles.formTitle, { color: colors.text1 }]}>
@@ -113,14 +111,14 @@ export default function ContactsScreen() {
               Save Contact
             </PrimaryButton>
           </View>
-        </View>
+        </GlassCard>
       )}
 
       {/* ── Contact Cards ── */}
       {!adding && contacts.length > 0 && (
         <View style={styles.contactList}>
           {contacts.map((contact, idx) => (
-            <View key={contact.id} style={[styles.contactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <GlassCard key={contact.id} style={styles.contactCard}>
               {/* Priority badge */}
               <View style={[styles.priorityBadge, { backgroundColor: priorityColor(idx) + '18' }]}>
                 <Text style={[styles.priorityText, { color: priorityColor(idx) }]}>
@@ -176,7 +174,7 @@ export default function ContactsScreen() {
                 <View style={[styles.readyDot, { backgroundColor: colors.safe }]} />
                 <Text style={[styles.readyText, { color: colors.safe }]}>Ready to receive alerts</Text>
               </View>
-            </View>
+            </GlassCard>
           ))}
 
           <PrimaryButton icon="plus" variant="secondary" onPress={() => openForm()}>
@@ -215,7 +213,7 @@ function Field({
         placeholderTextColor={colors.text4}
         style={[
           styles.input,
-          { backgroundColor: colors.background, borderColor: colors.input, color: colors.text1 },
+          { backgroundColor: 'transparent', borderColor: colors.input, color: colors.text1 },
         ]}
       />
     </View>
@@ -228,13 +226,13 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   screenTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   screenSub: { fontSize: 13, marginTop: 2 },
-  addBtn: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  screenSub: { fontSize: 13, marginTop: 2 },
 
   infoBanner: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, borderWidth: 1.5, padding: 12 },
   infoText: { fontSize: 13, fontWeight: '600', flex: 1 },
 
   // Form
-  form: { borderRadius: 24, borderWidth: 1.5, padding: 20, gap: 14 },
+  form: { padding: 20, gap: 14 },
   formHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
   formIconWrap: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   formTitle: { fontSize: 17, fontWeight: '700' },
@@ -247,7 +245,7 @@ const styles = StyleSheet.create({
 
   // Contact cards
   contactList: { gap: 12 },
-  contactCard: { borderRadius: 22, borderWidth: 1.5, padding: 18, gap: 14, overflow: 'hidden' },
+  contactCard: { padding: 18, gap: 14 },
   priorityBadge: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   priorityText: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   contactBody: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },

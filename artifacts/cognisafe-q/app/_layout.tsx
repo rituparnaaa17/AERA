@@ -42,6 +42,23 @@ function RootLayoutNav() {
   );
 }
 
+import { LinearGradient } from 'expo-linear-gradient';
+import { useColors } from '@/hooks/useColors';
+import { StyleSheet, View } from 'react-native';
+
+function RootBackground({ children }: { children: React.ReactNode }) {
+  const colors = useColors();
+  return (
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[colors.gradientStart, colors.gradientEnd]}
+        style={StyleSheet.absoluteFill}
+      />
+      {children}
+    </View>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
@@ -63,8 +80,10 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <TripProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <RootLayoutNav />
+            <GestureHandlerRootView style={styles.container}>
+              <RootBackground>
+                <RootLayoutNav />
+              </RootBackground>
             </GestureHandlerRootView>
           </TripProvider>
         </QueryClientProvider>
@@ -72,3 +91,9 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});

@@ -1,20 +1,22 @@
 import { useColorScheme } from 'react-native';
-import colors from '@/constants/colors';
+import colors, { ColorPalette } from '@/constants/colors';
 
-export type AppColors = typeof colors.light & { radius: number };
+export type AppColors = ColorPalette;
 
 /**
- * Returns the design tokens for the current color scheme.
- * Falls back to light palette. When dark key is defined, auto-switches.
+ * Returns the full design token set for the current color scheme.
+ * Falls back to light palette. Includes all geometry tokens (radius, radiusMd, radiusSm).
  */
 export function useColors(): AppColors {
   const scheme = useColorScheme();
   const palette =
     scheme === 'dark' && 'dark' in colors
-      ? (colors as {
-          light: typeof colors.light;
-          dark: typeof colors.dark;
-        }).dark
+      ? (colors as { light: typeof colors.light; dark: typeof colors.dark }).dark
       : colors.light;
-  return { ...palette, radius: colors.radius };
+  return {
+    ...palette,
+    radius: colors.radius,
+    radiusMd: colors.radiusMd,
+    radiusSm: colors.radiusSm,
+  } as AppColors;
 }

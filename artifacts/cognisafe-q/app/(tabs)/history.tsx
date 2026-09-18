@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { EmptyState, SectionHeader } from '@/components/AppPrimitives';
+import { EmptyState, SectionHeader, GlassCard } from '@/components/AppPrimitives';
 import { useTrip, Trip } from '@/components/TripContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -37,7 +37,7 @@ export default function HistoryScreen() {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 110 }]}
       showsVerticalScrollIndicator={false}
     >
@@ -45,8 +45,8 @@ export default function HistoryScreen() {
         /* ── Trip Detail ── */
         <View>
           <Pressable onPress={() => setSelected(null)} style={styles.backRow}>
-            <Feather name="arrow-left" size={18} color={colors.primary} />
-            <Text style={[styles.backText, { color: colors.primary }]}>All Trips</Text>
+            <Feather name="arrow-left" size={18} color={colors.brandBlue} />
+            <Text style={[styles.backText, { color: colors.brandBlue }]}>All Trips</Text>
           </Pressable>
 
           <Text style={[styles.detailDate, { color: colors.text1 }]}>{formatDate(selected.startedAt)}</Text>
@@ -55,7 +55,7 @@ export default function HistoryScreen() {
           </Text>
 
           {/* Score card */}
-          <View style={[styles.detailScoreCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <GlassCard style={styles.detailScoreCard}>
             <View style={styles.scoreLeft}>
               <Text style={[styles.scoreLabelSm, { color: colors.text3 }]}>SAFETY SCORE</Text>
               <Text style={[styles.scoreValueLg, { color: getTripScore(selected) >= 90 ? colors.safe : colors.warning }]}>
@@ -76,11 +76,11 @@ export default function HistoryScreen() {
                 </View>
               ))}
             </View>
-          </View>
+          </GlassCard>
 
           {/* Timeline */}
           <SectionHeader title="Timeline" />
-          <View style={[styles.timeline, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <GlassCard style={styles.timeline}>
             {selected.events.map((event, idx) => {
               const eventColor =
                 event.status === 'EMERGENCY'
@@ -109,7 +109,7 @@ export default function HistoryScreen() {
                 </View>
               );
             })}
-          </View>
+          </GlassCard>
         </View>
       ) : trips.length ? (
         /* ── Trip List ── */
@@ -118,7 +118,7 @@ export default function HistoryScreen() {
           <Text style={[styles.screenSub, { color: colors.text3 }]}>Your recent driving records</Text>
 
           {/* Overall score card */}
-          <View style={[styles.overallCard, { backgroundColor: colors.primary }]}>
+          <GlassCard style={[styles.overallCard, { backgroundColor: colors.brandBlue }]}>
             <View>
               <Text style={[styles.overallLabel, { color: 'rgba(255,255,255,0.7)' }]}>OVERALL SAFETY SCORE</Text>
               <Text style={[styles.overallScore, { color: '#FFFFFF' }]}>{totalScore}</Text>
@@ -129,7 +129,7 @@ export default function HistoryScreen() {
             <View style={[styles.overallBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
               <Feather name="shield" size={28} color="#FFFFFF" />
             </View>
-          </View>
+          </GlassCard>
 
           {/* Trip cards */}
           <SectionHeader title="Recent Trips" />
@@ -144,11 +144,11 @@ export default function HistoryScreen() {
                   key={trip.id}
                   onPress={() => setSelected(trip)}
                   style={({ pressed }) => [
-                    styles.tripCard,
-                    { backgroundColor: colors.card, borderColor: colors.border },
+                    styles.tripCardWrap,
                     pressed && { opacity: 0.8 },
                   ]}
                 >
+                  <GlassCard style={styles.tripCard}>
                   {/* Card header */}
                   <View style={styles.tripCardHeader}>
                     <View style={[styles.tripCardIcon, { backgroundColor: stateColor + '18' }]}>
@@ -174,6 +174,7 @@ export default function HistoryScreen() {
                       colors={colors}
                     />
                   </View>
+                  </GlassCard>
                 </Pressable>
               );
             })}
@@ -223,7 +224,7 @@ const styles = StyleSheet.create({
   // Detail
   detailDate: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: 4 },
   detailMeta: { fontSize: 13, marginBottom: 20 },
-  detailScoreCard: { borderRadius: 22, borderWidth: 1.5, padding: 20, flexDirection: 'row', gap: 20, marginBottom: 24 },
+  detailScoreCard: { padding: 20, flexDirection: 'row', gap: 20, marginBottom: 24 },
   scoreLeft: { alignItems: 'flex-start' },
   scoreLabelSm: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 4 },
   scoreValueLg: { fontSize: 52, fontWeight: '900', letterSpacing: -2, lineHeight: 56 },
@@ -235,7 +236,7 @@ const styles = StyleSheet.create({
   scoreStatValue: { fontSize: 14, fontWeight: '700' },
 
   // Timeline
-  timeline: { borderRadius: 20, borderWidth: 1.5, padding: 18 },
+  timeline: { padding: 18 },
   timelineRow: { flexDirection: 'row', gap: 14 },
   timelineLeft: { alignItems: 'center', width: 14 },
   timelineDot: { width: 12, height: 12, borderRadius: 6, marginTop: 3 },
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
   timelineTime: { fontSize: 12, marginTop: 3 },
 
   // Overall card
-  overallCard: { borderRadius: 24, padding: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  overallCard: { padding: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   overallLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 4 },
   overallScore: { fontSize: 56, fontWeight: '900', letterSpacing: -2, lineHeight: 60 },
   overallSub: { fontSize: 13, marginTop: 4 },
@@ -253,7 +254,8 @@ const styles = StyleSheet.create({
 
   // Trip list
   tripList: { gap: 12 },
-  tripCard: { borderRadius: 22, borderWidth: 1.5, padding: 16 },
+  tripCardWrap: { borderRadius: 20 },
+  tripCard: { padding: 16 },
   tripCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   tripCardIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   tripCardDate: { fontSize: 16, fontWeight: '700' },
