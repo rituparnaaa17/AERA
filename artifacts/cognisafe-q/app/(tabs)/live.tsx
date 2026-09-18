@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { Alert, Animated, Easing, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PrimaryButton, SectionHeader, StatusPill } from '@/components/AppPrimitives';
+import { PrimaryButton, SectionHeader, StatusPill, GlassCard } from '@/components/AppPrimitives';
 import { SensorStatusCard } from '@/components/SensorStatusCard';
 import { SOSButton } from '@/components/SOSButton';
 import { useTrip } from '@/components/TripContext';
@@ -51,7 +51,7 @@ export default function LiveTabScreen() {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 110 }]}
       showsVerticalScrollIndicator={false}
     >
@@ -68,9 +68,9 @@ export default function LiveTabScreen() {
       {!tripActive ? (
         /* ── No trip state ── */
         <View>
-          <View style={[styles.startCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.startIconWrap, { backgroundColor: '#FFF0F0' }]}>
-              <Feather name="shield" size={32} color={colors.primary} />
+          <GlassCard style={styles.startCard}>
+            <View style={[styles.startIconWrap, { backgroundColor: colors.brandBlueSubtle }]}>
+              <Feather name="shield" size={32} color={colors.brandBlue} />
             </View>
             <Text style={[styles.startTitle, { color: colors.text1 }]}>Nothing being monitored</Text>
             <Text style={[styles.startBody, { color: colors.text3 }]}>
@@ -86,7 +86,7 @@ export default function LiveTabScreen() {
             >
               Start Monitoring
             </PrimaryButton>
-          </View>
+          </GlassCard>
 
           {/* How it works mini */}
           <View style={styles.miniSteps}>
@@ -95,13 +95,13 @@ export default function LiveTabScreen() {
               ['cpu', 'AI Engine', 'SAFE / ALERT / EMERGENCY'],
               ['users', 'Response', 'Auto-notifies contacts'],
             ].map(([icon, title, sub]) => (
-              <View key={title} style={[styles.miniStep, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.miniStepIcon, { backgroundColor: '#FFF0F0' }]}>
-                  <Feather name={icon as React.ComponentProps<typeof Feather>['name']} size={18} color={colors.primary} />
+              <GlassCard key={title} style={styles.miniStep} noPadding>
+                <View style={[styles.miniStepIcon, { backgroundColor: colors.brandBlueSubtle }]}>
+                  <Feather name={icon as React.ComponentProps<typeof Feather>['name']} size={18} color={colors.brandBlue} />
                 </View>
                 <Text style={[styles.miniStepTitle, { color: colors.text1 }]}>{title}</Text>
                 <Text style={[styles.miniStepSub, { color: colors.text3 }]}>{sub}</Text>
-              </View>
+              </GlassCard>
             ))}
           </View>
         </View>
@@ -109,7 +109,7 @@ export default function LiveTabScreen() {
         /* ── Active trip state ── */
         <>
           {/* Status overview card */}
-          <View style={[styles.statusCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <GlassCard style={styles.statusCard}>
             <View style={styles.statusTop}>
               <View>
                 <Text style={[styles.statusLabel, { color: colors.text3 }]}>SAFETY STATUS</Text>
@@ -154,7 +154,7 @@ export default function LiveTabScreen() {
             >
               Open Full Monitoring View
             </PrimaryButton>
-          </View>
+          </GlassCard>
 
           {/* Sensor health */}
           <View style={styles.section}>
@@ -170,14 +170,14 @@ export default function LiveTabScreen() {
           {/* SOS */}
           <View style={styles.section}>
             <SectionHeader title="Emergency" />
-            <View style={[styles.sosCard, { backgroundColor: '#FFF0F0', borderColor: '#FFCCCC' }]}>
+            <GlassCard style={[styles.sosCard, { backgroundColor: '#FFF0F0', borderColor: '#FFCCCC' }]}>
               <Text style={[styles.sosTip, { color: colors.text3 }]}>
                 Hold the SOS button to trigger an emergency alert to your contacts.
               </Text>
               <View style={styles.sosCenter}>
                 <SOSButton onActivate={() => void triggerManualSos()} />
               </View>
-            </View>
+            </GlassCard>
           </View>
         </>
       )}
@@ -193,18 +193,18 @@ const styles = StyleSheet.create({
   screenSub: { fontSize: 13, marginTop: 2 },
 
   // No trip
-  startCard: { borderRadius: 24, borderWidth: 1.5, padding: 24, gap: 14, marginBottom: 16 },
+  startCard: { padding: 24, gap: 14, marginBottom: 16 },
   startIconWrap: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   startTitle: { fontSize: 20, fontWeight: '700' },
   startBody: { fontSize: 14, lineHeight: 21 },
   miniSteps: { flexDirection: 'row', gap: 10 },
-  miniStep: { flex: 1, borderRadius: 18, borderWidth: 1.5, padding: 14, gap: 6 },
+  miniStep: { flex: 1, padding: 14, gap: 6 },
   miniStepIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   miniStepTitle: { fontSize: 13, fontWeight: '700' },
   miniStepSub: { fontSize: 11, lineHeight: 15 },
 
   // Active trip
-  statusCard: { borderRadius: 24, borderWidth: 1.5, padding: 20, gap: 20 },
+  statusCard: { padding: 20, gap: 20 },
   statusTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   statusLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 4 },
   statusValue: { fontSize: 20, fontWeight: '800' },
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   smallMetricLabel: { fontSize: 11, marginTop: 2 },
 
   section: { gap: 12 },
-  sosCard: { borderRadius: 22, borderWidth: 1.5, padding: 20, gap: 16 },
+  sosCard: { padding: 20, gap: 16 },
   sosTip: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   sosCenter: { alignItems: 'center' },
 });

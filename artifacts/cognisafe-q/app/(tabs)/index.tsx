@@ -17,6 +17,8 @@ import {
   EmptyState,
   PrimaryButton,
   SectionHeader,
+  GlassCard,
+  IconButton,
 } from '@/components/AppPrimitives';
 import { useTrip } from '@/components/TripContext';
 
@@ -79,7 +81,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 110 }]}
       showsVerticalScrollIndicator={false}
     >
@@ -87,7 +89,7 @@ export default function HomeScreen() {
       <View style={styles.topBar}>
         <View style={styles.logoRow}>
           <Image
-            source={require('@/assets/images/logo.png')}
+            source={require('@/assets/images/cognisafe-icon.png')}
             style={styles.logoImg}
             resizeMode="contain"
           />
@@ -96,12 +98,10 @@ export default function HomeScreen() {
             <Text style={[styles.appTagline, { color: colors.text3 }]}>Vehicle Safety Monitor</Text>
           </View>
         </View>
-        <Pressable
+        <IconButton
+          icon="settings"
           onPress={() => router.push('/settings')}
-          style={[styles.headerIconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
-          <Feather name="settings" size={18} color={colors.text2} />
-        </Pressable>
+        />>
       </View>
 
       {/* ── Greeting ── */}
@@ -115,7 +115,7 @@ export default function HomeScreen() {
       </Text>
 
       {/* ── Hero Safety Card ── */}
-      <View style={[styles.heroCard, { backgroundColor: statusBg, borderColor: statusColor + '44' }]}>
+      <GlassCard style={[styles.heroCard, { backgroundColor: statusBg, borderColor: statusColor + '44' }]}>
         {/* Status indicator row */}
         <View style={styles.heroTop}>
           <View style={styles.heroStatusRow}>
@@ -126,7 +126,7 @@ export default function HomeScreen() {
           </View>
           {settings.demoMode && (
             <View style={[styles.demoBadge, { backgroundColor: colors.accent, borderColor: colors.border }]}>
-              <Text style={[styles.demoText, { color: colors.primary }]}>DEMO</Text>
+              <Text style={[styles.demoText, { color: colors.brandBlue }]}>DEMO</Text>
             </View>
           )}
         </View>
@@ -143,10 +143,10 @@ export default function HomeScreen() {
 
         {/* Phone placement tip */}
         {!tripActive && !placementConfirmed && (
-          <View style={[styles.placementCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <GlassCard style={styles.placementCard}>
             <View style={styles.placementHeader}>
               <View style={[styles.placementIcon, { backgroundColor: '#FFF0F0' }]}>
-                <Feather name="smartphone" size={15} color={colors.primary} />
+                <Feather name="smartphone" size={15} color={colors.brandBlue} />
               </View>
               <Text style={[styles.placementTitle, { color: colors.text1 }]}>Phone Placement</Text>
             </View>
@@ -157,9 +157,9 @@ export default function HomeScreen() {
               </View>
             ))}
             <Pressable onPress={() => setPlacementConfirmed(true)} style={styles.gotItBtn}>
-              <Text style={[styles.gotItText, { color: colors.primary }]}>Got it →</Text>
+              <Text style={[styles.gotItText, { color: colors.brandBlue }]}>Got it →</Text>
             </Pressable>
-          </View>
+          </GlassCard>
         )}
 
         {/* CTA Button */}
@@ -186,7 +186,7 @@ export default function HomeScreen() {
             </Text>
           </View>
         )}
-      </View>
+      </GlassCard>
 
       {/* ── Quick Metrics ── */}
       <View style={styles.metricsRow}>
@@ -203,7 +203,7 @@ export default function HomeScreen() {
           icon="navigation"
           label="Trips Protected"
           value={`${trips.length}`}
-          color={colors.primary}
+          color={colors.brandBlue}
           bg={colors.card}
           border={colors.border}
         />
@@ -227,7 +227,7 @@ export default function HomeScreen() {
             caption={contacts.length ? `${contacts.length} trusted people` : 'Add a contact'}
             onPress={() => router.push('/contacts')}
             accent="#FFF0F0"
-            iconColor={colors.primary}
+            iconColor={colors.brandBlue}
             colors={colors}
           />
           <QuickAction
@@ -245,7 +245,7 @@ export default function HomeScreen() {
       {/* ── How It Works ── */}
       <View style={styles.section}>
         <SectionHeader title="How It Works" />
-        <View style={[styles.stepsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <GlassCard style={styles.stepsCard} noPadding>
           {[
             { n: '01', t: 'Sensors Watch', b: 'Accelerometer, gyroscope and GPS monitor your journey in real-time.' },
             { n: '02', t: 'AI Analyzes', b: 'A 150-sample sliding window detects abnormal motion patterns instantly.' },
@@ -255,7 +255,7 @@ export default function HomeScreen() {
             <View key={n}>
               <View style={styles.step}>
                 <View style={[styles.stepNum, { backgroundColor: '#FFF0F0' }]}>
-                  <Text style={[styles.stepNumText, { color: colors.primary }]}>{n}</Text>
+                  <Text style={[styles.stepNumText, { color: colors.brandBlue }]}>{n}</Text>
                 </View>
                 <View style={styles.stepCopy}>
                   <Text style={[styles.stepTitle, { color: colors.text1 }]}>{t}</Text>
@@ -265,7 +265,7 @@ export default function HomeScreen() {
               {idx < arr.length - 1 && <View style={[styles.stepDivider, { backgroundColor: colors.border }]} />}
             </View>
           ))}
-        </View>
+        </GlassCard>
       </View>
     </ScrollView>
   );
@@ -285,7 +285,7 @@ function MetricCard({
   border: string;
 }) {
   return (
-    <View style={[styles.metricCard, { backgroundColor: bg, borderColor: border }]}>
+    <GlassCard style={[styles.metricCard, { backgroundColor: bg, borderColor: border }]} noPadding>
       <View style={[styles.metricIcon, { backgroundColor: color + '18' }]}>
         <Feather name={icon} size={14} color={color} />
       </View>
@@ -294,7 +294,7 @@ function MetricCard({
         {suffix ? <Text style={{ fontSize: 11 }}>{suffix}</Text> : null}
       </Text>
       <Text style={styles.metricLabel}>{label}</Text>
-    </View>
+    </GlassCard>
   );
 }
 
@@ -316,14 +316,16 @@ function QuickAction({
         onPress={onPress}
         onPressIn={() => Animated.spring(scaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 30 }).start()}
         onPressOut={() => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 30 }).start()}
-        style={[styles.quickCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        style={[styles.quickCard]}
       >
+        <GlassCard style={styles.quickCardInner}>
         <View style={[styles.quickIcon, { backgroundColor: accent }]}>
           <Feather name={icon} size={22} color={iconColor} />
         </View>
         <Text style={[styles.quickTitle, { color: colors.text1 }]}>{title}</Text>
         <Text style={[styles.quickCaption, { color: colors.text3 }]}>{caption}</Text>
         <Feather name="arrow-up-right" size={15} color={colors.text4} style={styles.quickArrow} />
+        </GlassCard>
       </Pressable>
     </Animated.View>
   );
@@ -336,7 +338,7 @@ const styles = StyleSheet.create({
   // Top bar
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoImg: { width: 40, height: 40 },
+  logoImg: { width: 46, height: 46 },
   appName: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
   appTagline: { fontSize: 11, fontWeight: '500' },
   headerIconBtn: { width: 42, height: 42, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
@@ -346,7 +348,7 @@ const styles = StyleSheet.create({
   greetingSub: { fontSize: 14, marginBottom: 20 },
 
   // Hero card
-  heroCard: { borderRadius: 28, borderWidth: 1.5, padding: 22, marginBottom: 16, gap: 14 },
+  heroCard: { padding: 22, marginBottom: 16, gap: 14 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   heroDot: { width: 10, height: 10, borderRadius: 5 },
@@ -358,7 +360,7 @@ const styles = StyleSheet.create({
   heroBtn: { marginTop: 4 },
 
   // Placement card
-  placementCard: { borderRadius: 16, borderWidth: 1.5, padding: 14, gap: 8 },
+  placementCard: { padding: 14, gap: 8 },
   placementHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
   placementIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   placementTitle: { fontSize: 14, fontWeight: '700' },
@@ -373,7 +375,7 @@ const styles = StyleSheet.create({
 
   // Metrics row
   metricsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  metricCard: { flex: 1, borderRadius: 18, borderWidth: 1.5, padding: 14, gap: 4 },
+  metricCard: { flex: 1, padding: 14, gap: 4 },
   metricIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   metricValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
   metricLabel: { fontSize: 10, color: '#737373', fontWeight: '500' },
@@ -383,14 +385,15 @@ const styles = StyleSheet.create({
 
   // Quick actions
   quickGrid: { flexDirection: 'row', gap: 12 },
-  quickCard: { borderRadius: 22, borderWidth: 1.5, padding: 18, minHeight: 150 },
+  quickCard: { flex: 1 },
+  quickCardInner: { padding: 18, minHeight: 150 },
   quickIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   quickTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
   quickCaption: { fontSize: 12, lineHeight: 17 },
   quickArrow: { position: 'absolute', top: 18, right: 18 },
 
   // Steps
-  stepsCard: { borderRadius: 22, borderWidth: 1.5, overflow: 'hidden' },
+  stepsCard: { },
   step: { flexDirection: 'row', gap: 14, padding: 18 },
   stepNum: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   stepNumText: { fontSize: 11, fontWeight: '800' },

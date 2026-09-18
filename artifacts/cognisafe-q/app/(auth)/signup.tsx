@@ -1,10 +1,11 @@
 /**
- * Signup Screen — Premium account creation
+ * Signup Screen — COGNISAFE-Q
+ * Premium account creation. Same brand language as Login.
  */
 
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Animated,
   Image,
@@ -19,6 +20,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { GlassCard } from '@/components/AppPrimitives';
+
+
 
 export default function SignupScreen() {
   const colors = useColors();
@@ -33,6 +37,15 @@ export default function SignupScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const btnAnim = useRef(new Animated.Value(1)).current;
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(10)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
 
   const handleSignup = async () => {
     if (!fullName.trim() || !email.trim() || !phone.trim() || !password) {
@@ -49,7 +62,7 @@ export default function SignupScreen() {
     }
     setError('');
     setLoading(true);
-    Animated.spring(btnAnim, { toValue: 0.96, useNativeDriver: true, speed: 30 }).start();
+    Animated.spring(btnAnim, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
     // TODO: Replace with actual Cognito signUp call
     await new Promise((r) => setTimeout(r, 1400));
     setLoading(false);
@@ -65,48 +78,118 @@ export default function SignupScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 40 }]}
+        style={[styles.container, { backgroundColor: 'transparent' }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Back + Brand ── */}
+        {/* ── Back ── */}
         <Pressable onPress={() => router.back()} style={styles.backRow}>
-          <Feather name="arrow-left" size={20} color={colors.text2} />
-          <Text style={[styles.backText, { color: colors.text2 }]}>Back</Text>
+          <Feather name="arrow-left" size={18} color={colors.text3} />
+          <Text style={[styles.backText, { color: colors.text3 }]}>Back</Text>
         </Pressable>
 
-        <View style={styles.brandSection}>
-          <Image source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={[styles.brandName, { color: colors.text1 }]}>Create Account</Text>
-          <Text style={[styles.brandSub, { color: colors.text3 }]}>
-            Join Cognisafe-Q and drive protected
+        {/* ── Brand Header ── */}
+        <Animated.View
+          style={[
+            styles.brandSection,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={[styles.accentRule, { backgroundColor: colors.brandCyan }]} />
+
+          <Image
+            source={require('@/assets/images/cognisafe-icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+
+          <Text style={[styles.wordmark, { color: colors.text1 }]}>
+            COGNISAFE-Q
           </Text>
-        </View>
+          <Text style={[styles.tagline, { color: colors.text3 }]}>
+            Intelligent safety for every journey.
+          </Text>
+
+          {/* Contextual sub-header for this screen */}
+          <View style={styles.screenHeadingRow}>
+            <Text style={[styles.screenTitle, { color: colors.text1 }]}>
+              Create Account
+            </Text>
+            <Text style={[styles.screenSub, { color: colors.text3 }]}>
+              Join Cognisafe-Q and drive protected
+            </Text>
+          </View>
+        </Animated.View>
 
         {/* ── Success banner ── */}
         {success && (
-          <View style={[styles.successBanner, { backgroundColor: '#F0FBF5', borderColor: colors.safeBorder }]}>
-            <Feather name="check-circle" size={16} color={colors.safe} />
-            <Text style={[styles.successText, { color: colors.safe }]}>Account created successfully! Redirecting to login…</Text>
+          <View
+            style={[
+              styles.successBanner,
+              { backgroundColor: colors.safeBackground, borderColor: colors.safeBorder },
+            ]}
+          >
+            <Feather name="check-circle" size={15} color={colors.safe} />
+            <Text style={[styles.successText, { color: colors.safe }]}>
+              Account created. Redirecting to sign in…
+            </Text>
           </View>
         )}
 
         {/* ── Error ── */}
         {error ? (
-          <View style={[styles.errorBanner, { backgroundColor: '#FFF0F0', borderColor: '#FFCCCC' }]}>
+          <View
+            style={[
+              styles.errorBanner,
+              { backgroundColor: '#FFF0F0', borderColor: '#FFCCCC' },
+            ]}
+          >
             <Feather name="alert-circle" size={14} color={colors.destructive} />
-            <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
+            <Text style={[styles.errorText, { color: colors.destructive }]}>
+              {error}
+            </Text>
           </View>
         ) : null}
 
         {/* ── Form ── */}
-        <View style={[styles.formCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <AuthField label="Full Name" icon="user" value={fullName} onChangeText={setFullName} placeholder="Alex Johnson" autoCapitalize="words" returnKeyType="next" colors={colors} />
-          <AuthField label="Email" icon="mail" value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" returnKeyType="next" colors={colors} />
-          <AuthField label="Phone Number" icon="phone" value={phone} onChangeText={setPhone} placeholder="+91 98765 43210" keyboardType="phone-pad" returnKeyType="next" colors={colors} />
+        <GlassCard style={styles.formCard}>
           <AuthField
-            label="Password"
+            label="FULL NAME"
+            icon="user"
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="Alex Johnson"
+            autoCapitalize="words"
+            returnKeyType="next"
+            colors={colors}
+          />
+          <AuthField
+            label="EMAIL"
+            icon="mail"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            returnKeyType="next"
+            colors={colors}
+          />
+          <AuthField
+            label="PHONE NUMBER"
+            icon="phone"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="+91 98765 43210"
+            keyboardType="phone-pad"
+            returnKeyType="next"
+            colors={colors}
+          />
+          <AuthField
+            label="PASSWORD"
             icon="lock"
             value={password}
             onChangeText={setPassword}
@@ -115,13 +198,20 @@ export default function SignupScreen() {
             returnKeyType="next"
             colors={colors}
             rightElement={
-              <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
-                <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={colors.text3} />
+              <Pressable
+                onPress={() => setShowPassword(!showPassword)}
+                hitSlop={10}
+              >
+                <Feather
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={17}
+                  color={colors.text3}
+                />
               </Pressable>
             }
           />
           <AuthField
-            label="Confirm Password"
+            label="CONFIRM PASSWORD"
             icon="lock"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
@@ -136,24 +226,39 @@ export default function SignupScreen() {
             <Pressable
               onPress={() => void handleSignup()}
               disabled={loading || success}
-              style={[styles.signupBtn, { backgroundColor: colors.primary }, (loading || success) && styles.disabled]}
+              style={[
+                styles.primaryBtn,
+                { backgroundColor: colors.brandBlue, borderColor: colors.brandBlue },
+                (loading || success) && styles.disabled,
+              ]}
             >
-              <Text style={styles.signupBtnText}>
+              <Text style={styles.primaryBtnText}>
                 {loading ? 'Creating Account…' : 'CREATE ACCOUNT'}
               </Text>
-              {!loading && <Feather name="arrow-right" size={18} color="#FFFFFF" />}
+              {!loading && (
+                <Feather name="arrow-right" size={16} color="#FFFFFF" />
+              )}
             </Pressable>
           </Animated.View>
-        </View>
+        </GlassCard>
 
         <View style={styles.loginRow}>
-          <Text style={[styles.loginText, { color: colors.text3 }]}>Already have an account?</Text>
+          <Text style={[styles.loginText, { color: colors.text3 }]}>
+            Already have an account?
+          </Text>
           <Pressable onPress={() => router.replace('/(auth)/login')}>
-            <Text style={[styles.loginLink, { color: colors.primary }]}> Sign in</Text>
+            <Text style={[styles.loginLink, { color: colors.brandBlue }]}>
+              {' '}Sign in
+            </Text>
           </Pressable>
         </View>
 
-        <View style={[styles.assurance, { backgroundColor: '#F0FBF5', borderColor: colors.safeBorder }]}>
+        <View
+          style={[
+            styles.assurance,
+            { backgroundColor: colors.safeBackground, borderColor: colors.safeBorder },
+          ]}
+        >
           <Feather name="shield" size={13} color={colors.safe} />
           <Text style={[styles.assuranceText, { color: colors.safe }]}>
             Passwords secured by AWS Cognito — never stored locally
@@ -164,17 +269,45 @@ export default function SignupScreen() {
   );
 }
 
+// ─── Auth Field ─────────────────────────────────────────────────────────────
+
+
 const AuthField = React.forwardRef<
   TextInput,
-  { label: string; icon: React.ComponentProps<typeof Feather>['name']; rightElement?: React.ReactNode; colors: ReturnType<typeof useColors> } & React.ComponentProps<typeof TextInput>
+  {
+    label: string;
+    icon: React.ComponentProps<typeof Feather>['name'];
+    rightElement?: React.ReactNode;
+    colors: ReturnType<typeof useColors>;
+  } & React.ComponentProps<typeof TextInput>
 >(function AuthFieldInner({ label, icon, rightElement, colors, ...props }, ref) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.field}>
       <Text style={[styles.fieldLabel, { color: colors.text3 }]}>{label}</Text>
-      <View style={[styles.fieldRow, { backgroundColor: colors.background, borderColor: focused ? colors.primary : colors.input, borderWidth: focused ? 2 : 1.5 }]}>
-        <Feather name={icon} size={17} color={focused ? colors.primary : colors.text3} />
-        <TextInput ref={ref} {...props} placeholderTextColor={colors.text4} style={[styles.fieldInput, { color: colors.text1 }]} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} />
+      <View
+        style={[
+          styles.fieldRow,
+          {
+            backgroundColor: 'transparent',
+            borderColor: focused ? colors.brandBlue : colors.input,
+            borderWidth: focused ? 1.5 : 1,
+          },
+        ]}
+      >
+        <Feather
+          name={icon}
+          size={16}
+          color={focused ? colors.brandBlue : colors.text4}
+        />
+        <TextInput
+          ref={ref}
+          {...props}
+          placeholderTextColor={colors.text4}
+          style={[styles.fieldInput, { color: colors.text1 }]}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
         {rightElement}
       </View>
     </View>
@@ -183,28 +316,151 @@ const AuthField = React.forwardRef<
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { paddingHorizontal: 24, gap: 16 },
-  backRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  backText: { fontSize: 15, fontWeight: '600' },
-  brandSection: { alignItems: 'center', gap: 6, marginBottom: 6 },
-  logo: { width: 64, height: 64 },
-  brandName: { fontSize: 24, fontWeight: '800' },
-  brandSub: { fontSize: 14, textAlign: 'center' },
-  successBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1.5, padding: 14 },
+  content: { paddingHorizontal: 24, gap: 0 },
+
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 16,
+  },
+  backText: { fontSize: 14, fontWeight: '500' },
+
+  // ── Brand ──
+  brandSection: {
+    alignItems: 'center',
+    paddingBottom: 24,
+  },
+  accentRule: {
+    width: 32,
+    height: 2,
+    marginBottom: 16,
+    borderRadius: 1,
+  },
+  logo: {
+    width: 72,
+    height: 72,
+    marginBottom: 14,
+  },
+  wordmark: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 3,
+    marginBottom: 5,
+  },
+  tagline: {
+    fontSize: 12,
+    letterSpacing: 0.2,
+    lineHeight: 17,
+    marginBottom: 20,
+  },
+  screenHeadingRow: {
+    alignItems: 'center',
+    gap: 3,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+    paddingTop: 16,
+    width: '100%',
+  },
+  screenTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  screenSub: {
+    fontSize: 13,
+  },
+
+  // ── Banners ──
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 14,
+  },
   successText: { fontSize: 13, flex: 1, fontWeight: '500' },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5, padding: 12 },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 11,
+    marginBottom: 14,
+  },
   errorText: { fontSize: 13, flex: 1 },
-  formCard: { borderRadius: 28, borderWidth: 1.5, padding: 24, gap: 14 },
-  field: { gap: 7 },
-  fieldLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
-  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, paddingHorizontal: 14, minHeight: 52 },
-  fieldInput: { flex: 1, fontSize: 15, paddingVertical: 12 },
-  signupBtn: { minHeight: 58, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: '#E53935', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
-  signupBtnText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 },
-  disabled: { opacity: 0.6 },
-  loginRow: { flexDirection: 'row', justifyContent: 'center' },
-  loginText: { fontSize: 14 },
-  loginLink: { fontSize: 14, fontWeight: '700' },
-  assurance: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, padding: 12, justifyContent: 'center' },
-  assuranceText: { fontSize: 12, flex: 1 },
+
+  // ── Form Card ──
+  formCard: {
+    gap: 13,
+    marginBottom: 20,
+  },
+
+  // ── Fields ──
+  field: { gap: 6 },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    paddingHorizontal: 13,
+    minHeight: 48,
+  },
+  fieldInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 10,
+  },
+
+  // ── Primary Button ──
+  primaryBtn: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  primaryBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 1.2,
+  },
+  disabled: { opacity: 0.55 },
+
+  // ── Login link ──
+  loginRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  loginText: { fontSize: 13 },
+  loginLink: { fontSize: 13, fontWeight: '700' },
+
+  // ── Assurance ──
+  assurance: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 12,
+    justifyContent: 'center',
+  },
+  assuranceText: { fontSize: 11, fontWeight: '500', flex: 1 },
 });

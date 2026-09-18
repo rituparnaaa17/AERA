@@ -7,10 +7,21 @@
     "icon": "./assets/images/cognisafe-icon.png",
     "scheme": "cognisafe-q",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": false
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0F1E"
     },
-    "android": {},
+    "ios": {
+      "supportsTablet": false,
+      "icon": "./assets/images/cognisafe-icon.png"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/cognisafe-icon.png",
+        "backgroundColor": "#0A0F1E"
+      }
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },

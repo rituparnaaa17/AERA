@@ -1,26 +1,92 @@
 /**
- * Cognisafe-Q Design System — AppPrimitives
+ * Cognisafe-Q Design System — AppPrimitives (Liquid Minimalism)
  *
- * Premium, safety-focused component library.
- * All components follow the new light/red design language.
+ * Glass-surfaced, Safety-Blue-accented component library.
+ * Squircle geometry: outer radius 20 → inner 14 → innermost 8.
+ * Alert Red is RESERVED for emergency / destructive states only.
  */
 
 import { Feather } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import React, { PropsWithChildren, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Easing,
+  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
   Text,
-  TextStyle,
+  useColorScheme,
   View,
   ViewStyle,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { SafetyStatus } from '@/components/TripContext';
+
+// ─── Glass Card ───────────────────────────────────────────────────────────────
+// The primary container primitive. Uses BlurView on capable platforms.
+
+export function GlassCard({
+  children,
+  style,
+  intensity = 60,
+  noPadding,
+}: PropsWithChildren<{
+  style?: StyleProp<ViewStyle>;
+  intensity?: number;
+  noPadding?: boolean;
+}>) {
+  const colors = useColors();
+  const isDark = useColorScheme() === 'dark';
+  const canBlur = Platform.OS === 'ios'; // BlurView backdrop only on iOS native
+
+  if (canBlur) {
+    return (
+      <BlurView
+        intensity={intensity}
+        tint={isDark ? 'dark' : 'light'}
+        style={[
+          styles.glassCard,
+          { borderColor: colors.glassBorder },
+          !noPadding && styles.cardPadding,
+          style,
+        ]}
+      >
+        {children}
+      </BlurView>
+    );
+  }
+
+  // Android / web: opaque tinted fallback
+  return (
+    <View
+      style={[
+        styles.glassCard,
+        { backgroundColor: colors.card, borderColor: colors.glassBorder },
+        !noPadding && styles.cardPadding,
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+// ─── Card (legacy alias → GlassCard) ─────────────────────────────────────────
+
+export function Card({
+  children,
+  style,
+  noPadding,
+}: PropsWithChildren<{ style?: StyleProp<ViewStyle>; noPadding?: boolean }>) {
+  return (
+    <GlassCard style={style} noPadding={noPadding}>
+      {children}
+    </GlassCard>
+  );
+}
 
 // ─── Screen Header ────────────────────────────────────────────────────────────
 
@@ -40,11 +106,15 @@ export function ScreenHeader({
     <View style={styles.header}>
       <View style={styles.headerCopy}>
         {eyebrow ? (
-          <Text style={[styles.eyebrow, { color: colors.primary }]}>{eyebrow.toUpperCase()}</Text>
+          <Text style={[styles.eyebrow, { color: colors.brandCyan }]}>
+            {eyebrow.toUpperCase()}
+          </Text>
         ) : null}
         <Text style={[styles.title, { color: colors.text1 }]}>{title}</Text>
         {subtitle ? (
-          <Text style={[styles.headerSubtitle, { color: colors.text3 }]}>{subtitle}</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.text3 }]}>
+            {subtitle}
+          </Text>
         ) : null}
       </View>
       {action}
@@ -64,7 +134,9 @@ export function SectionHeader({
   const colors = useColors();
   return (
     <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionHeaderText, { color: colors.text1 }]}>{title}</Text>
+      <Text style={[styles.sectionHeaderText, { color: colors.text2 }]}>
+        {title}
+      </Text>
       {action}
     </View>
   );
@@ -74,7 +146,6 @@ export function SectionHeader({
 
 export function StatusPill({ status }: { status: SafetyStatus }) {
   const colors = useColors();
-
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -99,18 +170,30 @@ export function StatusPill({ status }: { status: SafetyStatus }) {
   const config = {
     SAFE: { label: 'SAFE', color: colors.safe, bg: colors.safeBackground, border: colors.safeBorder },
     ALERT: { label: 'ALERT', color: colors.warning, bg: colors.warningBackground, border: colors.warningBorder },
-    EMERGENCY: { label: 'EMERGENCY', color: colors.destructive, bg: '#FFF0F0', border: '#FFCCCC' },
+    EMERGENCY: { label: 'EMERGENCY', color: colors.destructive, bg: colors.destructiveBackground, border: colors.destructiveBorder },
   }[status];
 
   return (
-    <View style={[styles.statusPill, { backgroundColor: config.bg, borderColor: config.border }]}>
-      <Animated.View style={[styles.statusDot, { backgroundColor: config.color, transform: [{ scale: pulseAnim }] }]} />
-      <Text style={[styles.statusPillText, { color: config.color }]}>{config.label}</Text>
+    <View
+      style={[
+        styles.statusPill,
+        { backgroundColor: config.bg, borderColor: config.border },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.statusDot,
+          { backgroundColor: config.color, transform: [{ scale: pulseAnim }] },
+        ]}
+      />
+      <Text style={[styles.statusPillText, { color: config.color }]}>
+        {config.label}
+      </Text>
     </View>
   );
 }
 
-// ─── Large Status Indicator ───────────────────────────────────────────────────
+// ─── Safety Status Card ───────────────────────────────────────────────────────
 
 export function SafetyStatusCard({
   status,
@@ -144,26 +227,21 @@ export function SafetyStatusCard({
 
   const stateColor =
     status === 'SAFE' ? colors.safe : status === 'ALERT' ? colors.warning : colors.destructive;
-  const stateLabel = label ?? (status === 'SAFE' ? 'You\'re Protected' : status === 'ALERT' ? 'Check In Now' : 'Emergency Active');
+  const stateLabel =
+    label ?? (status === 'SAFE' ? "You're Protected" : status === 'ALERT' ? 'Check In Now' : 'Emergency Active');
   const icon = status === 'SAFE' ? 'shield' : status === 'ALERT' ? 'alert-triangle' : 'alert-octagon';
 
   return (
     <View style={styles.safetyCardCenter}>
-      {/* Outer ring */}
       <Animated.View
-        style={[
-          styles.safetyRingOuter,
-          { borderColor: stateColor, opacity: ringAnim },
-        ]}
+        style={[styles.safetyRingOuter, { borderColor: stateColor, opacity: ringAnim }]}
       />
-      {/* Inner glow */}
       <Animated.View
         style={[
           styles.safetyRingInner,
           { backgroundColor: `${stateColor}18`, transform: [{ scale: pulseAnim }] },
         ]}
       />
-      {/* Core circle */}
       <View style={[styles.safetyCore, { backgroundColor: stateColor }]}>
         <Feather name={icon} size={34} color="#FFFFFF" />
       </View>
@@ -201,19 +279,42 @@ export function PrimaryButton({
   const colors = useColors();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const onPressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 30 }).start();
-  };
-  const onPressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
-  };
+  const onPressIn = () =>
+    Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
+  const onPressOut = () =>
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 40 }).start();
 
   const palette = {
-    primary: { backgroundColor: colors.primary, foreground: '#FFFFFF', borderColor: colors.primary },
-    secondary: { backgroundColor: colors.card, foreground: colors.text1, borderColor: colors.border },
-    danger: { backgroundColor: colors.destructive, foreground: '#FFFFFF', borderColor: colors.destructive },
-    ghost: { backgroundColor: 'transparent', foreground: colors.primary, borderColor: colors.border },
-    safe: { backgroundColor: colors.safe, foreground: '#FFFFFF', borderColor: colors.safe },
+    primary: {
+      backgroundColor: colors.brandBlue,
+      foreground: '#FFFFFF',
+      borderColor: colors.brandBlue,
+      shadowColor: colors.brandBlue,
+    },
+    secondary: {
+      backgroundColor: colors.card,
+      foreground: colors.text1,
+      borderColor: colors.glassBorder,
+      shadowColor: 'transparent',
+    },
+    danger: {
+      backgroundColor: colors.destructive,
+      foreground: '#FFFFFF',
+      borderColor: colors.destructive,
+      shadowColor: colors.destructive,
+    },
+    ghost: {
+      backgroundColor: 'transparent',
+      foreground: colors.brandBlue,
+      borderColor: colors.glassBorder,
+      shadowColor: 'transparent',
+    },
+    safe: {
+      backgroundColor: colors.safe,
+      foreground: '#FFFFFF',
+      borderColor: colors.safe,
+      shadowColor: colors.safe,
+    },
   }[variant];
 
   return (
@@ -226,14 +327,22 @@ export function PrimaryButton({
         onPressOut={onPressOut}
         style={[
           styles.button,
-          { backgroundColor: palette.backgroundColor, borderColor: palette.borderColor },
+          {
+            backgroundColor: palette.backgroundColor,
+            borderColor: palette.borderColor,
+            shadowColor: palette.shadowColor,
+          },
           (disabled || loading) && styles.disabled,
           style,
         ]}
       >
         {loading ? <ActivityIndicator color={palette.foreground} size="small" /> : null}
-        {!loading && icon ? <Feather name={icon} size={18} color={palette.foreground} /> : null}
-        <Text style={[styles.buttonText, { color: palette.foreground }]}>{children}</Text>
+        {!loading && icon ? (
+          <Feather name={icon} size={17} color={palette.foreground} />
+        ) : null}
+        <Text style={[styles.buttonText, { color: palette.foreground }]}>
+          {children}
+        </Text>
       </Pressable>
     </Animated.View>
   );
@@ -243,10 +352,12 @@ export function PrimaryButton({
 
 export function SectionLabel({ children }: PropsWithChildren) {
   const colors = useColors();
-  return <Text style={[styles.sectionLabel, { color: colors.text3 }]}>{children}</Text>;
+  return (
+    <Text style={[styles.sectionLabel, { color: colors.text3 }]}>{children}</Text>
+  );
 }
 
-// ─── Metric Card ──────────────────────────────────────────────────────────────
+// ─── Metric ───────────────────────────────────────────────────────────────────
 
 export function Metric({
   label,
@@ -264,7 +375,9 @@ export function Metric({
     <View style={[styles.metric, style]}>
       <View style={styles.metricRow}>
         <Text style={[styles.metricValue, { color: colors.text1 }]}>{value}</Text>
-        {unit ? <Text style={[styles.metricUnit, { color: colors.text3 }]}>{unit}</Text> : null}
+        {unit ? (
+          <Text style={[styles.metricUnit, { color: colors.text3 }]}>{unit}</Text>
+        ) : null}
       </View>
       <Text style={[styles.metricLabel, { color: colors.text3 }]}>{label}</Text>
     </View>
@@ -284,17 +397,19 @@ export function EmptyState({
 }) {
   const colors = useColors();
   return (
-    <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.emptyIconWrap, { backgroundColor: '#FFF0F0' }]}>
-        <Feather name={icon} size={24} color={colors.primary} />
+    <GlassCard style={styles.empty}>
+      <View
+        style={[styles.emptyIconWrap, { backgroundColor: colors.brandBlueSubtle }]}
+      >
+        <Feather name={icon} size={24} color={colors.brandBlue} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text1 }]}>{title}</Text>
       <Text style={[styles.emptyBody, { color: colors.text3 }]}>{body}</Text>
-    </View>
+    </GlassCard>
   );
 }
 
-// ─── Icon Button ─────────────────────────────────────────────────────────────
+// ─── Icon Button ──────────────────────────────────────────────────────────────
 
 export function IconButton({
   icon,
@@ -306,7 +421,12 @@ export function IconButton({
   variant?: 'default' | 'primary' | 'ghost';
 }) {
   const colors = useColors();
-  const bg = variant === 'primary' ? colors.primary : variant === 'ghost' ? 'transparent' : colors.card;
+  const bg =
+    variant === 'primary'
+      ? colors.brandBlue
+      : variant === 'ghost'
+      ? 'transparent'
+      : colors.card;
   const fg = variant === 'primary' ? '#FFFFFF' : colors.text2;
 
   return (
@@ -314,34 +434,12 @@ export function IconButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.iconButton,
-        { backgroundColor: bg, borderColor: colors.border },
-        pressed && { opacity: 0.75 },
+        { backgroundColor: bg, borderColor: colors.glassBorder },
+        pressed && { opacity: 0.72 },
       ]}
     >
       <Feather name={icon} size={19} color={fg} />
     </Pressable>
-  );
-}
-
-// ─── Card ─────────────────────────────────────────────────────────────────────
-
-export function Card({
-  children,
-  style,
-  noPadding,
-}: PropsWithChildren<{ style?: StyleProp<ViewStyle>; noPadding?: boolean }>) {
-  const colors = useColors();
-  return (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: colors.card, borderColor: colors.border },
-        !noPadding && styles.cardPadding,
-        style,
-      ]}
-    >
-      {children}
-    </View>
   );
 }
 
@@ -355,15 +453,49 @@ export function Divider() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  // Glass card
+  glassCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  cardPadding: { padding: 20 },
+
   // Header
-  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
   headerCopy: { flex: 1 },
-  eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 1.8, marginBottom: 6, textTransform: 'uppercase' },
-  title: { fontSize: 30, fontWeight: '800', letterSpacing: -0.8, lineHeight: 36 },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    lineHeight: 34,
+  },
   headerSubtitle: { fontSize: 14, marginTop: 4, lineHeight: 20 },
 
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  sectionHeaderText: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionHeaderText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
 
   // Status pill
   statusPill: {
@@ -372,12 +504,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
     borderRadius: 100,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
   },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusPillText: { fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusPillText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
 
   // Safety status card
   safetyCardCenter: { alignItems: 'center', paddingVertical: 8 },
@@ -386,7 +518,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    borderWidth: 1.5,
+    borderWidth: 1,
     top: 8 - 90 + 60,
   },
   safetyRingInner: {
@@ -403,42 +535,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
     shadowRadius: 16,
     elevation: 8,
   },
   safetyStatusLabel: {
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 3,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 2.5,
     marginTop: 18,
     textTransform: 'uppercase',
   },
   safetyStateSubtitle: { fontSize: 14, fontWeight: '500', marginTop: 4 },
   safetyConfidence: { fontSize: 12, marginTop: 4 },
 
-  // Button
+  // Primary button
   button: {
-    minHeight: 56,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  buttonText: { fontSize: 16, fontWeight: '700', letterSpacing: -0.1 },
+  buttonText: { fontSize: 15, fontWeight: '700', letterSpacing: 0.3 },
   disabled: { opacity: 0.45 },
 
   // Section label
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 10 },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
 
   // Metric
   metric: { flex: 1 },
@@ -450,30 +587,37 @@ const styles = StyleSheet.create({
   // Empty state
   empty: {
     alignItems: 'center',
-    borderRadius: 24,
-    borderWidth: 1.5,
+    borderRadius: 20,
     paddingHorizontal: 24,
     paddingVertical: 36,
     gap: 10,
   },
-  emptyIconWrap: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  emptyBody: { fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 260 },
+  emptyIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  emptyBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    maxWidth: 260,
+  },
 
   // Icon button
   iconButton: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    borderWidth: 1.5,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Card
-  card: { borderRadius: 24, borderWidth: 1.5 },
-  cardPadding: { padding: 20 },
-
   // Divider
-  divider: { height: 1, marginHorizontal: 0 },
+  divider: { height: 1 },
 });

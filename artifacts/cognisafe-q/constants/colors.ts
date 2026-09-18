@@ -1,131 +1,185 @@
 /**
- * Cognisafe-Q Design Tokens — Premium Safety App
+ * Cognisafe-Q Design Tokens — Liquid Minimalism
  *
  * Color philosophy:
- * - Light, clean backgrounds communicate calm and trustworthiness
- * - Deep red (#E53935) is reserved for SOS, emergency, and primary actions
- * - Green (#20A66A) signals SAFE — calm, reassuring
- * - Amber (#F59E0B) signals ALERT — noticeable but not panic-inducing
- * - Red (#E53935) signals EMERGENCY — immediate, unmistakable
+ * - brandBlue (#0E6BD1)  = Safety Blue — all primary interactive actions
+ * - brandCyan (#1AC7D6)  = Signal Cyan — accents, focused borders
+ * - safe     (#20A66A)  = SAFE state — calm, reassuring green
+ * - warning  (#F59E0B)  = ALERT state — noticeable amber
+ * - destructive (#EB3038) = EMERGENCY / validation errors ONLY
+ *
+ * Alert Red is RESERVED for actual emergency and error states.
+ * It must NOT be used for normal CTAs, navigation, or brand decoration.
  */
 
 const colors = {
   light: {
-    // Legacy aliases
-    text: '#222222',
-    tint: '#E53935',
+    // ── Legacy aliases ───────────────────────────────────────────────
+    text: '#1A1F2E',
+    tint: '#0E6BD1',
 
-    // Core surfaces
-    background: '#F7F7F5',
-    foreground: '#222222',
+    // ── Core surfaces ────────────────────────────────────────────────
+    background: '#F4F6FA',
+    foreground: '#1A1F2E',
 
-    // Cards / elevated surfaces
-    card: '#FFFFFF',
-    cardForeground: '#222222',
+    // ── Glass surfaces (for cards, modals, panels) ───────────────────
+    // Semi-transparent so the ambient gradient shows through
+    card: 'rgba(255, 255, 255, 0.70)',
+    cardForeground: '#1A1F2E',
+    glassBorder: 'rgba(255, 255, 255, 0.55)',
+    glassBorderStrong: 'rgba(14, 107, 209, 0.15)',
 
-    // Primary action color — Emergency Red
-    primary: '#E53935',
+    // ── Brand ────────────────────────────────────────────────────────
+    brandBlue: '#0E6BD1',         // Safety Blue — primary CTAs
+    brandCyan: '#1AC7D6',         // Signal Cyan — accents
+    brandBlueSubtle: 'rgba(14, 107, 209, 0.10)', // icon bg tint
+
+    // ── Primary action (Safety Blue, not red) ────────────────────────
+    primary: '#0E6BD1',
     primaryForeground: '#FFFFFF',
 
-    // Secondary red (softer)
-    secondary: '#FFF0F0',
-    secondaryForeground: '#E53935',
+    // ── Secondary / ghost ────────────────────────────────────────────
+    secondary: 'rgba(14, 107, 209, 0.08)',
+    secondaryForeground: '#0E6BD1',
 
-    // Muted / subdued elements
-    muted: '#F0F0EE',
-    mutedForeground: '#737373',
+    // ── Muted ────────────────────────────────────────────────────────
+    muted: 'rgba(0, 0, 0, 0.05)',
+    mutedForeground: '#6B7280',
 
-    // Accent — light red tint for backgrounds
-    accent: '#FFF5F5',
-    accentForeground: '#E53935',
+    // ── Accent ───────────────────────────────────────────────────────
+    accent: 'rgba(26, 199, 214, 0.08)',
+    accentForeground: '#0E6BD1',
 
-    // Safety states
+    // ── Safety states ────────────────────────────────────────────────
     safe: '#20A66A',
     safeForeground: '#FFFFFF',
-    safeBackground: '#F0FBF5',
-    safeBorder: '#B7E9D2',
+    safeBackground: 'rgba(32, 166, 106, 0.08)',
+    safeBorder: 'rgba(32, 166, 106, 0.25)',
 
     warning: '#F59E0B',
     warningForeground: '#FFFFFF',
-    warningBackground: '#FFFBEB',
-    warningBorder: '#FDE68A',
+    warningBackground: 'rgba(245, 158, 11, 0.08)',
+    warningBorder: 'rgba(245, 158, 11, 0.25)',
 
-    // Destructive / Emergency
-    destructive: '#E53935',
+    // ── Destructive — EMERGENCY & ERROR ONLY ────────────────────────
+    destructive: '#EB3038',
     destructiveForeground: '#FFFFFF',
+    destructiveBackground: 'rgba(235, 48, 56, 0.08)',
+    destructiveBorder: 'rgba(235, 48, 56, 0.25)',
 
-    // Borders and input outlines
-    border: '#E8E8E8',
-    input: '#E0E0E0',
+    // ── Borders & inputs ─────────────────────────────────────────────
+    border: 'rgba(255, 255, 255, 0.40)',
+    input: 'rgba(0, 0, 0, 0.10)',
 
-    // Surface elevations
-    surface1: '#FFFFFF',
-    surface2: '#F7F7F5',
-    surface3: '#EFEFED',
+    // ── Surface elevations ───────────────────────────────────────────
+    surface1: 'rgba(255, 255, 255, 0.90)',
+    surface2: '#F4F6FA',
+    surface3: 'rgba(255, 255, 255, 0.60)',
 
-    // Text hierarchy
-    text1: '#171717',
-    text2: '#404040',
-    text3: '#737373',
-    text4: '#A3A3A3',
+    // ── Text hierarchy ───────────────────────────────────────────────
+    text1: '#0D1117',
+    text2: '#374151',
+    text3: '#6B7280',
+    text4: '#9CA3AF',
 
-    // Special — dark overlay for hero sections
-    overlay: '#171717',
+    // ── Overlay ──────────────────────────────────────────────────────
+    overlay: 'rgba(9, 19, 33, 0.72)',
     overlayForeground: '#FFFFFF',
+
+    // ── Ambient gradient stops ───────────────────────────────────────
+    gradientStart: '#E0E7FF', // soft airy blue
+    gradientEnd: '#FAF5FF',   // pastel purple/cream
   },
 
   dark: {
-    text: '#F5F5F5',
-    tint: '#FF5A55',
+    // ── Legacy aliases ───────────────────────────────────────────────
+    text: '#E8ECF4',
+    tint: '#3B8FE8',
 
-    background: '#0F0F0F',
-    foreground: '#F5F5F5',
+    // ── Core surfaces ────────────────────────────────────────────────
+    background: '#07101E',
+    foreground: '#E8ECF4',
 
-    card: '#1A1A1A',
-    cardForeground: '#F5F5F5',
+    // ── Glass surfaces ───────────────────────────────────────────────
+    card: 'rgba(20, 20, 25, 0.60)',
+    cardForeground: '#E8ECF4',
+    glassBorder: 'rgba(255, 255, 255, 0.07)',
+    glassBorderStrong: 'rgba(59, 143, 232, 0.20)',
 
-    primary: '#FF5A55',
+    // ── Brand ────────────────────────────────────────────────────────
+    brandBlue: '#3B8FE8',
+    brandCyan: '#22D8E8',
+    brandBlueSubtle: 'rgba(59, 143, 232, 0.12)',
+
+    // ── Primary ──────────────────────────────────────────────────────
+    primary: '#3B8FE8',
     primaryForeground: '#FFFFFF',
 
-    secondary: '#2A1515',
-    secondaryForeground: '#FF5A55',
+    // ── Secondary ────────────────────────────────────────────────────
+    secondary: 'rgba(59, 143, 232, 0.10)',
+    secondaryForeground: '#3B8FE8',
 
-    muted: '#1F1F1F',
-    mutedForeground: '#737373',
+    // ── Muted ────────────────────────────────────────────────────────
+    muted: 'rgba(255, 255, 255, 0.06)',
+    mutedForeground: '#6B7280',
 
-    accent: '#2A1A1A',
-    accentForeground: '#FF5A55',
+    // ── Accent ───────────────────────────────────────────────────────
+    accent: 'rgba(34, 216, 232, 0.08)',
+    accentForeground: '#22D8E8',
 
+    // ── Safety states ────────────────────────────────────────────────
     safe: '#22C55E',
     safeForeground: '#FFFFFF',
-    safeBackground: '#0D2B1D',
-    safeBorder: '#166534',
+    safeBackground: 'rgba(34, 197, 94, 0.08)',
+    safeBorder: 'rgba(34, 197, 94, 0.22)',
 
     warning: '#F59E0B',
     warningForeground: '#000000',
-    warningBackground: '#2B1F00',
-    warningBorder: '#92400E',
+    warningBackground: 'rgba(245, 158, 11, 0.08)',
+    warningBorder: 'rgba(245, 158, 11, 0.22)',
 
-    destructive: '#EF4444',
+    // ── Destructive — EMERGENCY & ERROR ONLY ────────────────────────
+    destructive: '#F04046',
     destructiveForeground: '#FFFFFF',
+    destructiveBackground: 'rgba(240, 64, 70, 0.10)',
+    destructiveBorder: 'rgba(240, 64, 70, 0.25)',
 
-    border: '#2A2A2A',
-    input: '#333333',
+    // ── Borders & inputs ─────────────────────────────────────────────
+    border: 'rgba(255, 255, 255, 0.08)',
+    input: 'rgba(255, 255, 255, 0.10)',
 
-    surface1: '#1A1A1A',
-    surface2: '#0F0F0F',
-    surface3: '#262626',
+    // ── Surface elevations ───────────────────────────────────────────
+    surface1: 'rgba(20, 32, 55, 0.95)',
+    surface2: '#07101E',
+    surface3: 'rgba(15, 24, 42, 0.70)',
 
-    text1: '#F5F5F5',
-    text2: '#D4D4D4',
-    text3: '#737373',
-    text4: '#525252',
+    // ── Text hierarchy ───────────────────────────────────────────────
+    text1: '#F0F4FF',
+    text2: '#B8C4D8',
+    text3: '#7A8BA6',
+    text4: '#4A5568',
 
-    overlay: '#0F0F0F',
-    overlayForeground: '#F5F5F5',
+    // ── Overlay ──────────────────────────────────────────────────────
+    overlay: 'rgba(0, 0, 0, 0.78)',
+    overlayForeground: '#FFFFFF',
+
+    // ── Ambient gradient stops ───────────────────────────────────────
+    gradientStart: '#0F172A', // obsidian
+    gradientEnd: '#1E1B4B',   // dark midnight indigo
   },
 
-  radius: 20,
+  // ── Geometry ─────────────────────────────────────────────────────────
+  // Squircle-style concentric radii system
+  // Outer container → inner element → innermost element
+  radius: 20,    // outer cards
+  radiusMd: 14,  // inner elements (card → button/field)
+  radiusSm: 8,   // innermost (pill labels, badges)
+} as const;
+
+export type ColorPalette = typeof colors.light & {
+  radius: number;
+  radiusMd: number;
+  radiusSm: number;
 };
 
 export default colors;
