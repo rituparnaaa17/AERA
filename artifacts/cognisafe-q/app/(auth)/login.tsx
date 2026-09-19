@@ -21,6 +21,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { GlassCard } from '@/components/AppPrimitives';
+import { signIn, mapCognitoError } from '@/services/authService';
+
 
 
 export default function LoginScreen() {
@@ -52,11 +54,21 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
     Animated.spring(btnAnim, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
-    // TODO: Replace with actual Cognito signIn when credentials are provided
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
-    router.replace('/(tabs)');
+    try {
+      await signIn(email.trim().toLowerCase(), password);
+      Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
+      router.replace('/(tabs)');
+    } catch (err: unknown) {
+      const friendly = mapCognitoError(err);
+      setError(friendly);
+      // If user is not confirmed, guide them to verify
+      if ((err as { code?: string })?.code === 'UserNotConfirmedException') {
+        setError('Please verify your email first. Check your inbox for the confirmation code.');
+      }
+    } finally {
+      setLoading(false);
+      Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
+    }
   };
 
   const isDark = colors.background === '#0F0F0F';

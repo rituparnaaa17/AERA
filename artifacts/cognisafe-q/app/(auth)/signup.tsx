@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { GlassCard } from '@/components/AppPrimitives';
+import { signUp, confirmSignUp, resendConfirmationCode, mapCognitoError } from '@/services/authService';
 
 
 
@@ -36,6 +37,8 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmCode, setConfirmCode] = useState('');
   const btnAnim = useRef(new Animated.Value(1)).current;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -63,13 +66,43 @@ export default function SignupScreen() {
     setError('');
     setLoading(true);
     Animated.spring(btnAnim, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
-    // TODO: Replace with actual Cognito signUp call
-    await new Promise((r) => setTimeout(r, 1400));
-    setLoading(false);
-    Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
-    setSuccess(true);
-    await new Promise((r) => setTimeout(r, 1800));
-    router.replace('/(auth)/login');
+    try {
+      await signUp(email.trim().toLowerCase(), password, fullName.trim(), phone.trim() || undefined);
+      setShowConfirm(true); // Show email verification step
+    } catch (err: unknown) {
+      setError(mapCognitoError(err));
+    } finally {
+      setLoading(false);
+      Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!confirmCode.trim()) {
+      setError('Please enter the verification code from your email.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await confirmSignUp(email.trim().toLowerCase(), confirmCode.trim());
+      setSuccess(true);
+      await new Promise((r) => setTimeout(r, 1500));
+      router.replace('/(auth)/login');
+    } catch (err: unknown) {
+      setError(mapCognitoError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    try {
+      await resendConfirmationCode(email.trim().toLowerCase());
+      setError('');
+    } catch (err: unknown) {
+      setError(mapCognitoError(err));
+    }
   };
 
   return (
@@ -156,91 +189,137 @@ export default function SignupScreen() {
         ) : null}
 
         {/* ── Form ── */}
-        <GlassCard style={styles.formCard}>
-          <AuthField
-            label="FULL NAME"
-            icon="user"
-            value={fullName}
-            onChangeText={setFullName}
-            placeholder="Alex Johnson"
-            autoCapitalize="words"
-            returnKeyType="next"
-            colors={colors}
-          />
-          <AuthField
-            label="EMAIL"
-            icon="mail"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            returnKeyType="next"
-            colors={colors}
-          />
-          <AuthField
-            label="PHONE NUMBER"
-            icon="phone"
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+91 98765 43210"
-            keyboardType="phone-pad"
-            returnKeyType="next"
-            colors={colors}
-          />
-          <AuthField
-            label="PASSWORD"
-            icon="lock"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Min. 8 characters"
-            secureTextEntry={!showPassword}
-            returnKeyType="next"
-            colors={colors}
-            rightElement={
-              <Pressable
-                onPress={() => setShowPassword(!showPassword)}
-                hitSlop={10}
-              >
-                <Feather
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={17}
-                  color={colors.text3}
-                />
-              </Pressable>
-            }
-          />
-          <AuthField
-            label="CONFIRM PASSWORD"
-            icon="lock"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Repeat your password"
-            secureTextEntry={!showPassword}
-            returnKeyType="done"
-            onSubmitEditing={() => void handleSignup()}
-            colors={colors}
-          />
+        {!showConfirm ? (
+          <GlassCard style={styles.formCard}>
+            <AuthField
+              label="FULL NAME"
+              icon="user"
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Alex Johnson"
+              autoCapitalize="words"
+              returnKeyType="next"
+              colors={colors}
+            />
+            <AuthField
+              label="EMAIL"
+              icon="mail"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              returnKeyType="next"
+              colors={colors}
+            />
+            <AuthField
+              label="PHONE NUMBER"
+              icon="phone"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+91 98765 43210"
+              keyboardType="phone-pad"
+              returnKeyType="next"
+              colors={colors}
+            />
+            <AuthField
+              label="PASSWORD"
+              icon="lock"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Min. 8 characters"
+              secureTextEntry={!showPassword}
+              returnKeyType="next"
+              colors={colors}
+              rightElement={
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={10}
+                >
+                  <Feather
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={17}
+                    color={colors.text3}
+                  />
+                </Pressable>
+              }
+            />
+            <AuthField
+              label="CONFIRM PASSWORD"
+              icon="lock"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Repeat your password"
+              secureTextEntry={!showPassword}
+              returnKeyType="done"
+              onSubmitEditing={() => void handleSignup()}
+              colors={colors}
+            />
 
-          <Animated.View style={{ transform: [{ scale: btnAnim }] }}>
-            <Pressable
-              onPress={() => void handleSignup()}
-              disabled={loading || success}
-              style={[
-                styles.primaryBtn,
-                { backgroundColor: colors.brandBlue, borderColor: colors.brandBlue },
-                (loading || success) && styles.disabled,
-              ]}
-            >
-              <Text style={styles.primaryBtnText}>
-                {loading ? 'Creating Account…' : 'CREATE ACCOUNT'}
+            <Animated.View style={{ transform: [{ scale: btnAnim }] }}>
+              <Pressable
+                onPress={() => void handleSignup()}
+                disabled={loading || success}
+                style={[
+                  styles.primaryBtn,
+                  { backgroundColor: colors.brandBlue, borderColor: colors.brandBlue },
+                  (loading || success) && styles.disabled,
+                ]}
+              >
+                <Text style={styles.primaryBtnText}>
+                  {loading ? 'Creating Account…' : 'CREATE ACCOUNT'}
+                </Text>
+                {!loading && (
+                  <Feather name="arrow-right" size={16} color="#FFFFFF" />
+                )}
+              </Pressable>
+            </Animated.View>
+          </GlassCard>
+        ) : (
+          /* ── Email Verification Step ── */
+          <GlassCard style={styles.formCard}>
+            <View style={{ gap: 4, marginBottom: 4 }}>
+              <Text style={[styles.screenTitle, { color: colors.text1, fontSize: 18 }]}>
+                Verify your email
               </Text>
-              {!loading && (
-                <Feather name="arrow-right" size={16} color="#FFFFFF" />
-              )}
+              <Text style={[styles.tagline, { color: colors.text3 }]}>
+                We sent a 6-digit code to {email}
+              </Text>
+            </View>
+            <AuthField
+              label="VERIFICATION CODE"
+              icon="hash"
+              value={confirmCode}
+              onChangeText={setConfirmCode}
+              placeholder="6-digit code"
+              keyboardType="number-pad"
+              returnKeyType="done"
+              onSubmitEditing={() => void handleConfirm()}
+              colors={colors}
+            />
+            <Animated.View style={{ transform: [{ scale: btnAnim }] }}>
+              <Pressable
+                onPress={() => void handleConfirm()}
+                disabled={loading}
+                style={[
+                  styles.primaryBtn,
+                  { backgroundColor: colors.brandBlue, borderColor: colors.brandBlue },
+                  loading && styles.disabled,
+                ]}
+              >
+                <Text style={styles.primaryBtnText}>
+                  {loading ? 'Verifying…' : 'VERIFY EMAIL'}
+                </Text>
+                {!loading && <Feather name="check" size={16} color="#FFFFFF" />}
+              </Pressable>
+            </Animated.View>
+            <Pressable onPress={() => void handleResendCode()} style={{ alignItems: 'center', paddingVertical: 8 }}>
+              <Text style={{ color: colors.brandBlue, fontSize: 13, fontWeight: '600' }}>
+                Resend code
+              </Text>
             </Pressable>
-          </Animated.View>
-        </GlassCard>
+          </GlassCard>
+        )}
 
         <View style={styles.loginRow}>
           <Text style={[styles.loginText, { color: colors.text3 }]}>
@@ -268,6 +347,7 @@ export default function SignupScreen() {
     </KeyboardAvoidingView>
   );
 }
+
 
 // ─── Auth Field ─────────────────────────────────────────────────────────────
 

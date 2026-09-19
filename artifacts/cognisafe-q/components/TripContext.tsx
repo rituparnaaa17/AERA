@@ -19,6 +19,7 @@ import { predictSensorWindow, simulatePrediction, PredictionStatus } from '@/ser
 import { DEFAULT_COUNTDOWN_SECONDS } from '@/utils/constants';
 import { SensorWindowBuffer } from '@/services/sensorService';
 import { loadStoredState, saveStoredState } from '@/services/storageService';
+import { api } from '@/services/apiService';
 
 export type SafetyStatus = 'SAFE' | 'ALERT' | 'EMERGENCY';
 
@@ -190,8 +191,9 @@ export function TripProvider({ children }: PropsWithChildren) {
       setPermissionGranted(true);
     }
     const nextSession = createId();
+    const startedAt = new Date().toISOString();
     setSessionId(nextSession);
-    setTripStartedAt(new Date().toISOString());
+    setTripStartedAt(startedAt);
     setElapsedSeconds(0);
     setDistanceKm(0);
     setSpeedKmh(0);
@@ -206,22 +208,28 @@ export function TripProvider({ children }: PropsWithChildren) {
       {
         id: createId(),
         status: 'SAFE',
-        timestamp: new Date().toISOString(),
+        timestamp: startedAt,
         label: 'Trip started',
       },
     ]);
     sensorBuffer.current.clear();
     previousLocation.current = null;
     setTripActive(true);
+
+    // Backend sync — additive, does not block trip start
+    void api.trips.create({ tripId: nextSession, startTime: startedAt })
+      .catch((err) => console.warn('[TripContext] Backend trip create failed:', err));
+
     return true;
   }, []);
 
   const stopTrip = useCallback(async () => {
     if (!tripActive || !sessionId || !tripStartedAt) return;
+    const endedAt = new Date().toISOString();
     const nextTrip: Trip = {
       id: sessionId,
       startedAt: tripStartedAt,
-      endedAt: new Date().toISOString(),
+      endedAt,
       duration: elapsedSeconds,
       distance: distanceKm,
       hadAlert: tripEvents.some((event) => event.status === 'ALERT' || event.status === 'EMERGENCY'),
@@ -241,6 +249,16 @@ export function TripProvider({ children }: PropsWithChildren) {
     setEmergencySent(false);
     setCancelUntil(null);
     sensorBuffer.current.clear();
+
+    // Backend sync — additive, does not block trip end
+    void api.trips.update(sessionId, {
+      endTime: endedAt,
+      duration: elapsedSeconds,
+      distance: distanceKm,
+      alertCount: nextTrip.alertCount,
+      emergencyTriggered: nextTrip.emergencyTriggered,
+      safeWindows: windowsProcessed,
+    }).catch((err) => console.warn('[TripContext] Backend trip update failed:', err));
   }, [distanceKm, elapsedSeconds, sessionId, tripActive, tripEvents, tripStartedAt, windowsProcessed]);
 
   const sendEmergency = useCallback(async () => {
@@ -251,6 +269,7 @@ export function TripProvider({ children }: PropsWithChildren) {
       location,
       timestamp: new Date().toISOString(),
       notifyEmergencyServices: settings.notifyEmergencyServices,
+      confidence: confidence ?? 0.91,
     });
     setNetworkAvailable(true);
     setStatus('EMERGENCY');
@@ -259,7 +278,7 @@ export function TripProvider({ children }: PropsWithChildren) {
     setAlertExpiresAt(null);
     setAlertSecondsLeft(0);
     addEvent('EMERGENCY', 'Emergency alert sent');
-  }, [addEvent, settings.notifyEmergencyServices]);
+  }, [addEvent, confidence, settings.notifyEmergencyServices]);
 
   const triggerAlert = useCallback(
     (label: string, nextConfidence = 0.91) => {

@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { GlassCard } from '@/components/AppPrimitives';
+import { forgotPassword, confirmForgotPassword, mapCognitoError } from '@/services/authService';
 
 
 export default function ForgotPasswordScreen() {
@@ -50,11 +51,15 @@ export default function ForgotPasswordScreen() {
     setError('');
     setLoading(true);
     Animated.spring(btnAnim, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
-    // TODO: Call Cognito forgotPassword(email)
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
-    setStep(2);
+    try {
+      await forgotPassword(email.trim().toLowerCase());
+      setStep(2);
+    } catch (err: unknown) {
+      setError(mapCognitoError(err));
+    } finally {
+      setLoading(false);
+      Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
+    }
   };
 
   const resetPassword = async () => {
@@ -64,13 +69,17 @@ export default function ForgotPasswordScreen() {
     setError('');
     setLoading(true);
     Animated.spring(btnAnim, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
-    // TODO: Call Cognito confirmForgotPassword(email, code, newPassword)
-    await new Promise((r) => setTimeout(r, 1400));
-    setLoading(false);
-    Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
-    setSuccess(true);
-    await new Promise((r) => setTimeout(r, 1800));
-    router.replace('/(auth)/login');
+    try {
+      await confirmForgotPassword(email.trim().toLowerCase(), code.trim(), newPassword);
+      setSuccess(true);
+      await new Promise((r) => setTimeout(r, 1500));
+      router.replace('/(auth)/login');
+    } catch (err: unknown) {
+      setError(mapCognitoError(err));
+    } finally {
+      setLoading(false);
+      Animated.spring(btnAnim, { toValue: 1, useNativeDriver: true }).start();
+    }
   };
 
   return (
