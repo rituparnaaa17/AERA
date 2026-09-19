@@ -1,31 +1,53 @@
 /**
- * Trip Summary Screen — Post-trip summary with score and timeline
+ * Trip Complete — Batch 3B (reference screen 13)
+ *
+ * Score ring, celebration mascot, real trip stats from `useTrip().lastCompletedTrip`.
+ * Score band is derived (safe=96, alert=78, emergency=52) matching the previous
+ * band logic — no fabricated numbers.
  */
 
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PrimaryButton } from '@/components/AppPrimitives';
+import { AppBackground } from '@/components/AppBackground';
+import { Mascot } from '@/components/Mascot';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { QSafetyHalo } from '@/components/QSafetyHalo';
 import { useTrip } from '@/components/TripContext';
-import { useColors } from '@/hooks/useColors';
 
-export default function SummaryScreen() {
-  const colors = useColors();
+const NAVY = '#0F1E4A';
+const NAVY_SOFT = '#334155';
+const MUTED = '#64748B';
+const SAFE = '#22C55E';
+const WARN = '#F59E0B';
+const DANGER = '#EF4444';
+const CARD_BORDER = '#E2ECF7';
+
+export default function TripCompleteScreen() {
   const insets = useSafeAreaInsets();
   const { lastCompletedTrip, dismissCompletedTrip } = useTrip();
-
   const scoreAnim = useRef(new Animated.Value(0)).current;
 
-  if (!lastCompletedTrip) {
-    router.replace('/');
-    return null;
-  }
+  useEffect(() => {
+    // If someone lands here with no completed trip, drop them onto the Home
+    // Dashboard (the tabs group), not the Landing splash.
+    if (!lastCompletedTrip) router.replace('/(tabs)');
+  }, [lastCompletedTrip]);
 
-  const alerts = lastCompletedTrip.alertCount ?? lastCompletedTrip.events.filter((e) => e.status === 'ALERT').length;
-  const score = lastCompletedTrip.emergencyTriggered ? 52 : alerts ? 78 : 96;
-  const scoreColor = score >= 90 ? colors.safe : score >= 70 ? colors.warning : colors.destructive;
+  const alerts = lastCompletedTrip
+    ? lastCompletedTrip.alertCount ?? lastCompletedTrip.events.filter((e) => e.status === 'ALERT').length
+    : 0;
+  const emergencies = lastCompletedTrip?.emergencyTriggered ? 1 : 0;
+  const score = !lastCompletedTrip
+    ? 0
+    : lastCompletedTrip.emergencyTriggered
+    ? 52
+    : alerts
+    ? 78
+    : 96;
+  const scoreColor = score >= 90 ? SAFE : score >= 70 ? WARN : DANGER;
   const scoreLabel = score >= 90 ? 'Excellent' : score >= 70 ? 'Good' : 'Needs Review';
 
   useEffect(() => {
@@ -37,166 +59,188 @@ export default function SummaryScreen() {
     }).start();
   }, [score, scoreAnim]);
 
+  if (!lastCompletedTrip) return null;
+
   const durationMin = Math.floor(lastCompletedTrip.duration / 60);
+  const mascotPose = lastCompletedTrip.emergencyTriggered ? 'heart' : 'celebrate';
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 28, paddingBottom: insets.bottom + 32 }]}
-    >
-      {/* ── Trip complete header ── */}
-      <View style={styles.completeHeader}>
-        <View style={[styles.completeIcon, { backgroundColor: colors.safeBackground, borderColor: colors.safeBorder }]}>
-          <Feather name="check-circle" size={32} color={colors.safe} />
+    <AppBackground fadeStrength="default">
+      <StatusBar barStyle="dark-content" />
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Mascot size={140} pose={mascotPose} />
+          <Text style={styles.eyebrow}>TRIP COMPLETE</Text>
+          <Text style={styles.title}>
+            {lastCompletedTrip.emergencyTriggered ? 'Take care of yourself.' : 'You drove safely.'}
+          </Text>
+          <Text style={styles.sub}>Your monitored drive has been saved to trip history.</Text>
         </View>
-        <Text style={[styles.completeEyebrow, { color: colors.safe }]}>TRIP COMPLETE</Text>
-        <Text style={[styles.completeTitle, { color: colors.text1 }]}>You arrived safely.</Text>
-        <Text style={[styles.completeSub, { color: colors.text3 }]}>
-          Your monitored drive has been saved to trip history.
-        </Text>
-      </View>
 
-      {/* ── Score card ── */}
-      <View style={[styles.scoreCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.scoreCardTop}>
-          <View>
-            <Text style={[styles.scoreLabelSmall, { color: colors.text3 }]}>SAFETY SCORE</Text>
-            <Animated.Text style={[styles.scoreNumber, { color: scoreColor }]}>
-              {score}
-            </Animated.Text>
-            <Text style={[styles.scoreLabel, { color: scoreColor }]}>{scoreLabel}</Text>
-          </View>
-          <View style={[styles.scoreIcon, { backgroundColor: scoreColor + '18' }]}>
-            <Feather
-              name={lastCompletedTrip.emergencyTriggered ? 'alert-triangle' : 'shield'}
-              size={28}
-              color={scoreColor}
-            />
-          </View>
-        </View>
-        {/* Score bar */}
-        <View style={[styles.scoreBar, { backgroundColor: colors.muted }]}>
-          <Animated.View
-            style={[
-              styles.scoreBarFill,
-              {
-                backgroundColor: scoreColor,
-                width: scoreAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
-              },
-            ]}
+        {/* Q Safety Halo */}
+        <View style={styles.scoreCard}>
+          <QSafetyHalo
+            value={score}
+            size={200}
+            stroke={11}
+            color={scoreColor}
+            centerLabel={`${score}`}
+            centerCaption={scoreLabel}
+            centerColor={scoreColor}
+            captionColor={NAVY_SOFT}
           />
         </View>
-        <Text style={[styles.scoreBarLabel, { color: colors.text4 }]}>{score} / 100</Text>
-      </View>
 
-      {/* ── Trip metrics ── */}
-      <View style={[styles.metricsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TripMetric icon="clock" label="Duration" value={`${durationMin} min`} colors={colors} />
-        <View style={[styles.metricsDivider, { backgroundColor: colors.border }]} />
-        <TripMetric icon="navigation" label="Distance" value={`${lastCompletedTrip.distance.toFixed(1)} km`} colors={colors} />
-      </View>
+        {/* Distance + duration */}
+        <View style={styles.metricsRow}>
+          <MetricTile label="Distance" value={`${lastCompletedTrip.distance.toFixed(1)}`} unit="km" />
+          <MetricTile label="Duration" value={`${durationMin}`} unit="min" />
+        </View>
 
-      {/* ── Stats ── */}
-      <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <StatRow
-          icon="shield"
-          label="Safe Windows"
-          value={`${lastCompletedTrip.safeWindows ?? 0}`}
-          color={colors.safe}
-          colors={colors}
-        />
-        <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
-        <StatRow
-          icon="alert-triangle"
-          label="Alerts"
-          value={`${alerts}`}
-          color={alerts > 0 ? colors.warning : colors.text3}
-          colors={colors}
-        />
-        <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
-        <StatRow
-          icon="alert-octagon"
-          label="Emergencies"
-          value={lastCompletedTrip.emergencyTriggered ? '1' : '0'}
-          color={lastCompletedTrip.emergencyTriggered ? colors.destructive : colors.text3}
-          colors={colors}
-        />
-      </View>
+        {/* Stats */}
+        <View style={styles.statsCard}>
+          <StatRow icon="shield" label="Safe Windows" value={`${lastCompletedTrip.safeWindows ?? 0}`} color={SAFE} />
+          <View style={styles.statDivider} />
+          <StatRow icon="alert-triangle" label="Alerts" value={`${alerts}`} color={alerts > 0 ? WARN : MUTED} />
+          <View style={styles.statDivider} />
+          <StatRow icon="alert-octagon" label="Emergencies" value={`${emergencies}`} color={emergencies > 0 ? DANGER : MUTED} />
+        </View>
 
-      {/* ── Actions ── */}
-      <View style={styles.actions}>
-        <PrimaryButton
-          icon="clock"
-          onPress={() => { dismissCompletedTrip(); router.replace('/history'); }}
-        >
-          View Trip Details
-        </PrimaryButton>
-        <PrimaryButton
-          variant="ghost"
-          icon="home"
-          onPress={() => { dismissCompletedTrip(); router.replace('/'); }}
-        >
-          Back to Home
-        </PrimaryButton>
-      </View>
-    </ScrollView>
+        {/* Actions */}
+        <View style={styles.actions}>
+          <PrimaryButton
+            label="View Trip Summary"
+            onPress={() => {
+              const id = lastCompletedTrip.id;
+              // Navigate FIRST, then dismiss on the next tick so summary's
+              // "no completed trip" guard doesn't race the intended route.
+              router.replace(`/(tabs)/history?open=${encodeURIComponent(id)}`);
+              setTimeout(() => dismissCompletedTrip(), 250);
+            }}
+            style={styles.actionBtn}
+          />
+          <Pressable
+            onPress={() => router.push('/analytics' as never)}
+            style={styles.secondaryBtn}
+          >
+            <Feather name="bar-chart-2" size={16} color={NAVY} />
+            <Text style={styles.secondaryText}>View Safety Analytics</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              router.replace('/(tabs)');
+              setTimeout(() => dismissCompletedTrip(), 250);
+            }}
+            style={styles.secondaryBtn}
+          >
+            <Feather name="home" size={16} color={NAVY} />
+            <Text style={styles.secondaryText}>Back to Home</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </AppBackground>
   );
 }
 
-function TripMetric({ icon, label, value, colors }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; colors: ReturnType<typeof useColors> }) {
+function MetricTile({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (
-    <View style={styles.tripMetric}>
-      <View style={[styles.tripMetricIcon, { backgroundColor: colors.muted }]}>
-        <Feather name={icon} size={15} color={colors.text3} />
-      </View>
-      <Text style={[styles.tripMetricValue, { color: colors.text1 }]}>{value}</Text>
-      <Text style={[styles.tripMetricLabel, { color: colors.text3 }]}>{label}</Text>
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>
+        {value}
+        <Text style={styles.metricUnit}> {unit}</Text>
+      </Text>
     </View>
   );
 }
 
-function StatRow({ icon, label, value, color, colors }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; color: string; colors: ReturnType<typeof useColors> }) {
+function StatRow({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  label: string;
+  value: string;
+  color: string;
+}) {
   return (
     <View style={styles.statRow}>
       <Feather name={icon} size={16} color={color} />
-      <Text style={[styles.statLabel, { color: colors.text2 }]}>{label}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { paddingHorizontal: 24, gap: 16 },
+  scroll: { paddingHorizontal: 20, gap: 16 },
 
-  completeHeader: { alignItems: 'center', gap: 10, marginBottom: 8 },
-  completeIcon: { width: 72, height: 72, borderRadius: 24, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  completeEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 2 },
-  completeTitle: { fontSize: 32, fontWeight: '800', letterSpacing: -1, textAlign: 'center' },
-  completeSub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  header: { alignItems: 'center', gap: 8 },
+  eyebrow: { color: SAFE, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
+  title: { color: NAVY, fontSize: 28, fontWeight: '800', letterSpacing: -0.6, textAlign: 'center' },
+  sub: { color: NAVY_SOFT, fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
-  scoreCard: { borderRadius: 22, borderWidth: 1.5, padding: 20, gap: 14 },
-  scoreCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  scoreLabelSmall: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 4 },
-  scoreNumber: { fontSize: 60, fontWeight: '900', letterSpacing: -2, lineHeight: 64 },
-  scoreLabel: { fontSize: 14, fontWeight: '600', marginTop: 2 },
-  scoreIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  scoreBar: { height: 8, borderRadius: 8, overflow: 'hidden' },
-  scoreBarFill: { height: '100%', borderRadius: 8 },
-  scoreBarLabel: { fontSize: 11, textAlign: 'right' },
+  scoreCard: {
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    shadowColor: NAVY,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
 
-  metricsCard: { borderRadius: 20, borderWidth: 1.5, flexDirection: 'row', padding: 20 },
-  metricsDivider: { width: 1, marginHorizontal: 20 },
-  tripMetric: { flex: 1, alignItems: 'center', gap: 6 },
-  tripMetricIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  tripMetricValue: { fontSize: 22, fontWeight: '800' },
-  tripMetricLabel: { fontSize: 12 },
+  metricsRow: { flexDirection: 'row', gap: 10 },
+  metric: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: 'center',
+    gap: 4,
+  },
+  metricLabel: { color: MUTED, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  metricValue: { color: NAVY, fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
+  metricUnit: { color: MUTED, fontSize: 14, fontWeight: '700' },
 
-  statsCard: { borderRadius: 20, borderWidth: 1.5, overflow: 'hidden' },
-  statRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 15 },
-  statLabel: { flex: 1, fontSize: 14 },
-  statValue: { fontSize: 16, fontWeight: '700' },
-  statsDivider: { height: 1, marginHorizontal: 15 },
+  statsCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  statLabel: { flex: 1, color: NAVY, fontSize: 14, fontWeight: '600' },
+  statValue: { fontSize: 16, fontWeight: '800' },
+  statDivider: { height: 1, backgroundColor: CARD_BORDER, marginHorizontal: 14 },
 
-  actions: { gap: 12, marginTop: 4 },
+  actions: { gap: 10 },
+  actionBtn: { alignSelf: 'stretch' },
+  secondaryBtn: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryText: { color: NAVY, fontSize: 14, fontWeight: '700' },
 });

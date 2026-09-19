@@ -1,23 +1,53 @@
 /**
- * Trip Screen — Full-screen glanceable monitoring view
- * Star screen of Cognisafe-Q. Premium, minimal, safety-command-center feel.
+ * Live Trip — Batch 3B (reference screen 8)
+ *
+ * Composition:
+ *   • Top bar with back / title / close
+ *   • Green "Monitoring" pill
+ *   • Driving mascot inside soft radial rings
+ *   • Live metrics row: Speed / Distance / Duration (all real state)
+ *   • Sensor Health card (shared component)
+ *   • Red swipe-to-activate SOS (reuses SlideToConfirm with variant="red")
+ *
+ * The screen auto-navigates to Alert / Emergency / Summary via the root
+ * layout's status watcher — same routing logic as before, unchanged.
  */
 
+import React, { useEffect, useRef } from 'react';
+import {
+  Alert,
+  Animated,
+  Easing,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
-import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors } from '@/hooks/useColors';
-import { PrimaryButton } from '@/components/AppPrimitives';
-import { SOSButton } from '@/components/SOSButton';
+import { AppBackground } from '@/components/AppBackground';
+import { Mascot } from '@/components/Mascot';
+import { SensorGrid } from '@/components/SensorTiles';
+import { SlideToConfirm } from '@/components/SlideToConfirm';
 import { useTrip } from '@/components/TripContext';
 
-const formatTime = (s: number) =>
-  `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const NAVY = '#0F1E4A';
+const NAVY_SOFT = '#334155';
+const MUTED = '#64748B';
+const CARD_BORDER = '#E2ECF7';
+const SAFE = '#22C55E';
+const WARN = '#F59E0B';
+const DANGER = '#EF4444';
 
-export default function TripScreen() {
-  const colors = useColors();
+const formatTime = (s: number) =>
+  `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(
+    Math.floor((s % 3600) / 60)
+  ).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+export default function LiveTripScreen() {
   const insets = useSafeAreaInsets();
   const {
     tripActive,
@@ -26,230 +56,296 @@ export default function TripScreen() {
     distanceKm,
     speedKmh,
     confidence,
-    alertSecondsLeft,
-    emergencySent,
-    canCancelEmergency,
     stopTrip,
-    acknowledgeOk,
-    cancelEmergency,
     triggerManualSos,
+    permissionGranted,
+    settings,
+    networkAvailable,
+    windowsProcessed,
+    lastCompletedTrip,
   } = useTrip();
 
-  if (!tripActive) {
-    router.replace('/');
-    return null;
-  }
+  const pulse = useRef(new Animated.Value(1)).current;
 
-  const statusColor =
-    status === 'SAFE' ? colors.safe : status === 'ALERT' ? colors.warning : colors.destructive;
-  const statusBg =
-    status === 'SAFE' ? colors.safeBackground : status === 'ALERT' ? colors.warningBackground : '#FFF0F0';
-
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const outerRingAnim = useRef(new Animated.Value(0.8)).current;
+  // Hooks BEFORE any conditional return.
+  // Only fall back to Home if there is no trip in flight AND no just-completed
+  // trip waiting to be shown in the summary — otherwise the "End Trip" handoff
+  // to /summary races and lands us on the landing page.
+  useEffect(() => {
+    if (!tripActive && !lastCompletedTrip) router.replace('/(tabs)');
+  }, [tripActive, lastCompletedTrip]);
 
   useEffect(() => {
     const speed = status === 'EMERGENCY' ? 400 : status === 'ALERT' ? 700 : 2000;
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.12, duration: speed, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: speed, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+        Animated.timing(pulse, { toValue: 1.15, duration: speed, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+        Animated.timing(pulse, { toValue: 1, duration: speed, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
       ])
     ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(outerRingAnim, { toValue: 1, duration: speed * 1.5, useNativeDriver: true }),
-        Animated.timing(outerRingAnim, { toValue: 0.8, duration: speed * 1.5, useNativeDriver: true }),
-      ])
-    ).start();
-    return () => { pulseAnim.stopAnimation(); outerRingAnim.stopAnimation(); };
-  }, [status, pulseAnim, outerRingAnim]);
+    return () => pulse.stopAnimation();
+  }, [status, pulse]);
+
+  if (!tripActive) return null;
+
+  const statusColor = status === 'EMERGENCY' ? DANGER : status === 'ALERT' ? WARN : SAFE;
+  const pillLabel = status === 'EMERGENCY' ? 'Emergency' : status === 'ALERT' ? 'Alerted' : 'Monitoring';
+  const encouragement =
+    status === 'EMERGENCY'
+      ? 'Emergency response active'
+      : status === 'ALERT'
+      ? 'Please confirm you\'re okay'
+      : "You're doing great!";
+
+  const endTripConfirm = () =>
+    Alert.alert('End Trip?', 'Your trip will be saved to history.', [
+      { text: 'Keep driving', style: 'cancel' },
+      {
+        text: 'End trip',
+        style: 'destructive',
+        onPress: async () => {
+          await stopTrip();
+          router.replace('/summary');
+        },
+      },
+    ]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
+    <AppBackground fadeStrength="default">
+      <StatusBar barStyle="dark-content" />
 
-      {/* ── Top Bar ── */}
-      <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={[styles.topBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
-          <Feather name="chevron-left" size={22} color={colors.text2} />
+      {/* ── Top bar ── */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => router.back()} style={styles.topBtn} hitSlop={8}>
+          <Feather name="chevron-left" size={22} color={NAVY} />
         </Pressable>
         <View style={styles.topCenter}>
-          <Text style={[styles.topTitle, { color: colors.text1 }]}>Live Trip</Text>
-          <View style={styles.liveRow}>
-            <Animated.View style={[styles.liveDot, { backgroundColor: statusColor, transform: [{ scale: pulseAnim }] }]} />
-            <Text style={[styles.liveText, { color: statusColor }]}>MONITORING</Text>
+          <Text style={styles.topTitle}>Live Trip</Text>
+          <View
+            style={[
+              styles.monitorPill,
+              { backgroundColor: statusColor + '1F', borderColor: statusColor + '55' },
+            ]}
+          >
+            <Animated.View
+              style={[styles.monitorDot, { backgroundColor: statusColor, transform: [{ scale: pulse }] }]}
+            />
+            <Text style={[styles.monitorText, { color: statusColor }]}>{pillLabel}</Text>
           </View>
         </View>
-        <Pressable
-          onPress={() =>
-            Alert.alert('End Trip?', 'Your trip will be saved to history.', [
-              { text: 'Keep driving', style: 'cancel' },
-              { text: 'End trip', style: 'destructive', onPress: async () => { await stopTrip(); router.replace('/summary'); } },
-            ])
-          }
-          style={[styles.topBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
-          <Feather name="x" size={20} color={colors.text2} />
+        <Pressable onPress={endTripConfirm} style={styles.topBtn} hitSlop={8}>
+          <Feather name="x" size={20} color={NAVY} />
         </Pressable>
       </View>
 
-      {/* ── Main Status ── */}
-      <View style={[styles.statusSection, { backgroundColor: statusBg }]}>
-        {/* Rings */}
-        <View style={styles.ringContainer}>
-          <Animated.View style={[styles.outerRing, { borderColor: statusColor, opacity: outerRingAnim }]} />
-          <Animated.View style={[styles.innerRing, { borderColor: statusColor, transform: [{ scale: pulseAnim }] }]} />
-          {/* Core */}
-          <View style={[styles.statusCore, { backgroundColor: statusColor }]}>
-            <Feather
-              name={status === 'SAFE' ? 'shield' : status === 'ALERT' ? 'alert-triangle' : 'alert-octagon'}
-              size={36}
-              color="#FFFFFF"
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: insets.bottom + 120 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Mascot inside soft rings ── */}
+        <View style={styles.heroCard}>
+          <View style={styles.ringWrap}>
+            <Animated.View
+              style={[styles.ringOuter, { borderColor: statusColor + '55', transform: [{ scale: pulse }] }]}
+            />
+            <View style={[styles.ringInner, { backgroundColor: statusColor + '14' }]} />
+            <Mascot size={172} pose="driving" />
+          </View>
+          <Text style={styles.heroTitle}>{encouragement}</Text>
+          <Text style={styles.heroSub}>Stay focused. Drive safe.</Text>
+          {confidence != null && (
+            <Text style={styles.confidenceText}>{Math.round(confidence * 100)}% AI confidence</Text>
+          )}
+        </View>
+
+        {/* ── Metrics ── */}
+        <View style={styles.metricsRow}>
+          <MetricTile label="Speed" value={`${Math.round(speedKmh)}`} unit="km/h" color={statusColor} />
+          <MetricTile label="Distance" value={distanceKm.toFixed(1)} unit="km" />
+          <MetricTile label="Duration" value={formatTime(elapsedSeconds)} />
+        </View>
+
+        {/* ── AI Analyze quick-link ── */}
+        <Pressable
+          onPress={() => router.push('/analyzing')}
+          style={styles.aiLink}
+          accessibilityRole="button"
+        >
+          <View style={styles.aiIconBubble}>
+            <Feather name="cpu" size={16} color="#2563EB" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.aiLinkTitle}>View AI Analysis</Text>
+            <Text style={styles.aiLinkSub}>See what the model is checking right now.</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color="#94A3B8" />
+        </Pressable>
+
+        {/* ── Sensor Health ── */}
+        <Text style={styles.sectionTitle}>Sensor Health</Text>
+        <SensorGrid
+          locationReady={permissionGranted === true}
+          isMockAi={settings.mockAi}
+          isOffline={!networkAvailable}
+          windowsProcessed={windowsProcessed}
+        />
+
+        {/* ── Swipe SOS ── */}
+        <Text style={[styles.sectionTitle, { marginTop: 6 }]}>Emergency</Text>
+        <View style={styles.sosCard}>
+          <Text style={styles.sosCardCopy}>
+            Swipe to send an SOS to your emergency contacts with your live location.
+          </Text>
+          <View style={{ marginTop: 4 }}>
+            <SlideToConfirm
+              variant="red"
+              label="Swipe to Send SOS"
+              onConfirm={() => {
+                void triggerManualSos();
+                router.replace('/emergency');
+              }}
             />
           </View>
         </View>
-        <Text style={[styles.bigStatus, { color: statusColor }]}>
-          {status === 'SAFE' ? 'SAFE' : status === 'ALERT' ? 'ALERT' : 'EMERGENCY'}
-        </Text>
-        <Text style={[styles.statusSub, { color: colors.text3 }]}>
-          {status === 'SAFE' ? 'Monitoring your journey' : status === 'ALERT' ? 'Unusual motion detected' : 'Emergency response active'}
-        </Text>
-        {confidence != null && (
-          <Text style={[styles.confidenceText, { color: colors.text4 }]}>
-            {Math.round(confidence * 100)}% AI confidence
-          </Text>
-        )}
-      </View>
-
-      {/* ── Speed Gauge ── */}
-      <View style={[styles.speedCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.speedMain}>
-          <Text style={[styles.speedNumber, { color: statusColor }]}>{Math.round(speedKmh)}</Text>
-          <Text style={[styles.speedUnit, { color: colors.text3 }]}>km/h</Text>
-        </View>
-        <View style={[styles.speedTrack, { backgroundColor: colors.muted }]}>
-          <View style={[styles.speedFill, { width: `${Math.min(100, (speedKmh / 140) * 100)}%`, backgroundColor: statusColor }]} />
-        </View>
-      </View>
-
-      {/* ── Trip Metrics ── */}
-      <View style={[styles.metricsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TripMetric label="Duration" value={formatTime(elapsedSeconds)} icon="clock" color={colors.text1} colors={colors} />
-        <View style={[styles.metricDivider, { backgroundColor: colors.border }]} />
-        <TripMetric label="Distance" value={`${distanceKm.toFixed(1)} km`} icon="navigation" color={colors.text1} colors={colors} />
-      </View>
-
-      {/* ── Alert Countdown Overlay ── */}
-      {status === 'ALERT' && (
-        <View style={[styles.alertBox, { backgroundColor: colors.warningBackground, borderColor: colors.warningBorder }]}>
-          <Text style={[styles.alertBoxTitle, { color: colors.warning }]}>⚠ Are you okay?</Text>
-          <Text style={[styles.countdown, { color: colors.warning }]}>{alertSecondsLeft}</Text>
-          <Text style={[styles.countdownLabel, { color: colors.text3 }]}>seconds to respond</Text>
-          <PrimaryButton icon="check" onPress={acknowledgeOk} testID="im-ok" variant="safe">
-            I'm OK — Confirm Safe
-          </PrimaryButton>
-        </View>
-      )}
-
-      {/* ── Emergency Note ── */}
-      {emergencySent && (
-        <View style={[styles.emergencyNote, { backgroundColor: '#FFF0F0', borderColor: '#FFCCCC' }]}>
-          <Feather name="radio" size={18} color={colors.destructive} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.emergencyNoteTitle, { color: colors.destructive }]}>Emergency alert sent</Text>
-            <Text style={[styles.emergencyNoteSub, { color: colors.text3 }]}>Your location shared with contacts</Text>
-          </View>
-          {canCancelEmergency && (
-            <Pressable onPress={cancelEmergency}>
-              <Text style={[styles.cancelFalse, { color: colors.text3 }]}>Cancel</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
-
-      {/* ── SOS Section ── */}
-      {status !== 'ALERT' && (
-        <View style={styles.sosSection}>
-          <SOSButton
-            onActivate={() => void triggerManualSos()}
-            disabled={emergencySent}
-          />
-          <Text style={[styles.sosCap, { color: colors.text4 }]}>Hold for emergency</Text>
-        </View>
-      )}
-    </View>
+      </ScrollView>
+    </AppBackground>
   );
 }
 
-function TripMetric({
-  label, value, icon, color, colors,
+function MetricTile({
+  label,
+  value,
+  unit,
+  color,
 }: {
-  label: string; value: string; icon: React.ComponentProps<typeof Feather>['name'];
-  color: string; colors: ReturnType<typeof useColors>;
+  label: string;
+  value: string;
+  unit?: string;
+  color?: string;
 }) {
   return (
-    <View style={styles.tripMetric}>
-      <Feather name={icon} size={14} color={colors.text3} />
-      <View>
-        <Text style={[styles.tripMetricValue, { color }]}>{value}</Text>
-        <Text style={[styles.tripMetricLabel, { color: colors.text3 }]}>{label}</Text>
-      </View>
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={[styles.metricValue, color ? { color } : null]}>
+        {value}
+        {unit ? <Text style={styles.metricUnit}> {unit}</Text> : null}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
-  topBtn: { width: 42, height: 42, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  topBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   topCenter: { alignItems: 'center' },
-  topTitle: { fontSize: 16, fontWeight: '700' },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
-  liveDot: { width: 7, height: 7, borderRadius: 3.5 },
-  liveText: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  topTitle: { color: NAVY, fontSize: 16, fontWeight: '800' },
+  monitorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  monitorDot: { width: 7, height: 7, borderRadius: 3.5 },
+  monitorText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
 
-  // Status section
-  statusSection: { alignItems: 'center', paddingTop: 36, paddingBottom: 28, paddingHorizontal: 24 },
-  ringContainer: { width: 200, height: 200, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  outerRing: { position: 'absolute', width: 200, height: 200, borderRadius: 100, borderWidth: 1 },
-  innerRing: { position: 'absolute', width: 160, height: 160, borderRadius: 80, borderWidth: 1.5 },
-  statusCore: { width: 110, height: 110, borderRadius: 55, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 },
-  bigStatus: { fontSize: 26, fontWeight: '900', letterSpacing: 3 },
-  statusSub: { fontSize: 14, marginTop: 6, textAlign: 'center' },
-  confidenceText: { fontSize: 12, marginTop: 4 },
+  scroll: { paddingHorizontal: 20, gap: 16 },
 
-  // Speed
-  speedCard: { marginHorizontal: 20, borderRadius: 20, borderWidth: 1.5, padding: 20, marginBottom: 12 },
-  speedMain: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 12 },
-  speedNumber: { fontSize: 56, fontWeight: '900', letterSpacing: -2, lineHeight: 60 },
-  speedUnit: { fontSize: 16, fontWeight: '600', paddingBottom: 8 },
-  speedTrack: { height: 6, borderRadius: 6, overflow: 'hidden' },
-  speedFill: { height: '100%', borderRadius: 6, minWidth: 6 },
+  heroCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    gap: 4,
+    shadowColor: NAVY,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 2,
+  },
+  ringWrap: {
+    width: 210,
+    height: 210,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  ringOuter: { position: 'absolute', width: 210, height: 210, borderRadius: 105, borderWidth: 1.5 },
+  ringInner: { position: 'absolute', width: 172, height: 172, borderRadius: 86 },
+  heroTitle: { color: NAVY, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  heroSub: { color: NAVY_SOFT, fontSize: 13 },
+  confidenceText: { color: MUTED, fontSize: 12, marginTop: 2 },
 
-  // Metrics
-  metricsCard: { marginHorizontal: 20, borderRadius: 18, borderWidth: 1.5, flexDirection: 'row', padding: 18, marginBottom: 12 },
-  metricDivider: { width: 1, marginHorizontal: 18 },
-  tripMetric: { flex: 1, flexDirection: 'row', gap: 10, alignItems: 'center' },
-  tripMetricValue: { fontSize: 18, fontWeight: '700' },
-  tripMetricLabel: { fontSize: 12, marginTop: 2 },
+  metricsRow: { flexDirection: 'row', gap: 10 },
+  metric: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    gap: 2,
+  },
+  metricLabel: { color: MUTED, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  metricValue: { color: NAVY, fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  metricUnit: { color: MUTED, fontSize: 12, fontWeight: '600' },
 
-  // Alert box
-  alertBox: { marginHorizontal: 20, borderRadius: 22, borderWidth: 1.5, padding: 20, alignItems: 'center', gap: 10, marginBottom: 12 },
-  alertBoxTitle: { fontSize: 16, fontWeight: '700' },
-  countdown: { fontSize: 68, fontWeight: '900', letterSpacing: -2, lineHeight: 72 },
-  countdownLabel: { fontSize: 14, marginBottom: 4 },
+  sectionTitle: { color: NAVY, fontSize: 15, fontWeight: '800', letterSpacing: -0.2, marginTop: 4 },
 
-  // Emergency note
-  emergencyNote: { marginHorizontal: 20, borderRadius: 16, borderWidth: 1.5, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  emergencyNoteTitle: { fontSize: 14, fontWeight: '700' },
-  emergencyNoteSub: { fontSize: 12, marginTop: 2 },
-  cancelFalse: { fontSize: 12, fontWeight: '600' },
+  sosCard: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FCA5A5',
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 16,
+    gap: 8,
+  },
+  sosCardCopy: { color: '#7F1D1D', fontSize: 13, lineHeight: 19 },
 
-  // SOS
-  sosSection: { alignItems: 'center', gap: 8, marginTop: 8 },
-  sosCap: { fontSize: 12, fontWeight: '500' },
+  aiLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 18,
+    padding: 14,
+  },
+  aiIconBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiLinkTitle: { color: NAVY, fontSize: 14, fontWeight: '800' },
+  aiLinkSub: { color: NAVY_SOFT, fontSize: 12, marginTop: 2 },
 });

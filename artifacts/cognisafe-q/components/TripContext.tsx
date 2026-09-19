@@ -29,6 +29,12 @@ export type TripEvent = {
   label: string;
 };
 
+export type RouteSample = {
+  lat: number;
+  lng: number;
+  t: number; // epoch ms
+};
+
 export type Trip = {
   id: string;
   startedAt: string;
@@ -40,6 +46,7 @@ export type Trip = {
   alertCount?: number;
   emergencyTriggered?: boolean;
   safeWindows?: number;
+  route?: RouteSample[]; // GPS samples captured during the trip
 };
 
 export type Contact = {
@@ -133,6 +140,7 @@ export function TripProvider({ children }: PropsWithChildren) {
   const latestAcceleration = useRef({ x: 0, y: 0, z: 0, timestamp: 0 });
   const latestRotation = useRef({ x: 0, y: 0, z: 0, timestamp: 0 });
   const previousLocation = useRef<{ lat: number; lng: number } | null>(null);
+  const routeSamples = useRef<RouteSample[]>([]);
   const statusRef = useRef(status);
   const sessionRef = useRef(sessionId);
   useKeepAwake(tripActive ? 'cognisafe-trip' : undefined);
@@ -212,12 +220,50 @@ export function TripProvider({ children }: PropsWithChildren) {
     ]);
     sensorBuffer.current.clear();
     previousLocation.current = null;
+    routeSamples.current = [];
     setTripActive(true);
+
+    // Seed the route buffer with an immediate fix so stationary trips still
+    // have at least one usable coordinate. The 5m-distance watcher below
+    // won't fire on a still device, so this is the source of the "1 sample"
+    // stationary case.
+    if (Platform.OS !== 'web') {
+      try {
+        const first = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        const { latitude, longitude } = first.coords;
+        previousLocation.current = { lat: latitude, lng: longitude };
+        routeSamples.current.push({ lat: latitude, lng: longitude, t: Date.now() });
+      } catch {
+        // No fix yet — the watcher will pick one up as soon as it's available.
+      }
+    }
+
     return true;
   }, []);
 
   const stopTrip = useCallback(async () => {
     if (!tripActive || !sessionId || !tripStartedAt) return;
+
+    // Edge case: subscription never fired (permissions revoked mid-trip,
+    // very short trip, etc.). Try to grab one final fix so at least a
+    // single marker survives on Trip Details.
+    if (routeSamples.current.length === 0 && Platform.OS !== 'web') {
+      try {
+        const last = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        routeSamples.current.push({
+          lat: last.coords.latitude,
+          lng: last.coords.longitude,
+          t: Date.now(),
+        });
+      } catch {
+        // No fix — Trip Details will show the "Route unavailable" state.
+      }
+    }
+
     const nextTrip: Trip = {
       id: sessionId,
       startedAt: tripStartedAt,
@@ -229,6 +275,7 @@ export function TripProvider({ children }: PropsWithChildren) {
       alertCount: tripEvents.filter((event) => event.status === 'ALERT').length,
       emergencyTriggered: tripEvents.some((event) => event.status === 'EMERGENCY'),
       safeWindows: windowsProcessed,
+      route: routeSamples.current.length ? routeSamples.current.slice() : undefined,
     };
     setTrips((current) => [nextTrip, ...current].slice(0, 30));
     setLastCompletedTrip(nextTrip);
@@ -349,7 +396,11 @@ export function TripProvider({ children }: PropsWithChildren) {
     let cancelled = false;
     let subscription: Location.LocationSubscription | null = null;
     void Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.Balanced, timeInterval: 1000, distanceInterval: 5 },
+      // A `distanceInterval` of 5 m suppressed callbacks on stationary
+      // devices (the phone never moved 5 m so no fix arrived). Set it to 0
+      // so `timeInterval` alone drives updates — this keeps parked / desk
+      // trips populated with at least one sample per second.
+      { accuracy: Location.Accuracy.Balanced, timeInterval: 1000, distanceInterval: 0 },
       (location) => {
         if (cancelled) return;
         const { latitude, longitude, speed } = location.coords;
@@ -365,6 +416,16 @@ export function TripProvider({ children }: PropsWithChildren) {
           setDistanceKm((current) => current + 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
         }
         previousLocation.current = { lat: latitude, lng: longitude };
+        // Persist the sample for later replay in Trip Details / Live Location.
+        // Skip duplicate consecutive fixes (identical stationary coordinate)
+        // so the buffer doesn't fill with 3 600 identical rows/hour. Cap to
+        // 2 000 entries as an overall safety.
+        const buf = routeSamples.current;
+        const last = buf[buf.length - 1];
+        const isDupe =
+          last && last.lat === latitude && last.lng === longitude;
+        if (!isDupe) buf.push({ lat: latitude, lng: longitude, t: Date.now() });
+        if (buf.length > 2000) buf.splice(0, buf.length - 2000);
       },
     ).then((nextSubscription) => {
       if (cancelled) nextSubscription.remove();

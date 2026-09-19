@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, PrimaryButton, GlassCard, IconButton } from '@/components/AppPrimitives';
+import { AppBackground } from '@/components/AppBackground';
+import { Mascot } from '@/components/Mascot';
 import { useTrip, Contact } from '@/components/TripContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -48,9 +50,11 @@ export default function ContactsScreen() {
 
   const priorityLabel = (idx: number) =>
     idx === 0 ? 'PRIMARY' : idx === 1 ? 'SECONDARY' : `#${idx + 1}`;
+  const priorityColor = (idx: number) =>
     idx === 0 ? colors.brandBlue : idx === 1 ? colors.warning : colors.text3;
 
   return (
+    <AppBackground fadeStrength="default">
     <ScrollView
       style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 110 }]}
@@ -127,11 +131,14 @@ export default function ContactsScreen() {
               </View>
 
               <View style={styles.contactBody}>
-                {/* Avatar */}
+                {/*
+                  Avatar — the Contact model has no gender field, so we use a
+                  neutral person icon for everyone. Do not infer gender from
+                  the name. If a gender field is added later, this is the
+                  place to branch on it.
+                */}
                 <View style={[styles.avatar, { backgroundColor: priorityColor(idx) + '20' }]}>
-                  <Text style={[styles.avatarText, { color: priorityColor(idx) }]}>
-                    {contact.name.slice(0, 1).toUpperCase()}
-                  </Text>
+                  <Feather name="user" size={24} color={priorityColor(idx)} />
                 </View>
 
                 {/* Info */}
@@ -186,6 +193,9 @@ export default function ContactsScreen() {
       {/* ── Empty state ── */}
       {!adding && contacts.length === 0 && (
         <View style={styles.emptySection}>
+          <View style={{ alignItems: 'center', marginBottom: 4 }}>
+            <Mascot size={140} pose="heart" />
+          </View>
           <EmptyState
             icon="users"
             title="No contacts yet"
@@ -197,6 +207,7 @@ export default function ContactsScreen() {
         </View>
       )}
     </ScrollView>
+    </AppBackground>
   );
 }
 
@@ -225,7 +236,6 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, gap: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   screenTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  screenSub: { fontSize: 13, marginTop: 2 },
   screenSub: { fontSize: 13, marginTop: 2 },
 
   infoBanner: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, borderWidth: 1.5, padding: 12 },
