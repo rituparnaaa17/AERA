@@ -7,10 +7,10 @@ jest.mock('../lambda/shared/dynamo', () => ({
   dbQuery: jest.fn(),
   dbUpdate: jest.fn(),
   TABLES: {
-    users: 'cognisafe-users',
-    contacts: 'cognisafe-contacts',
-    trips: 'cognisafe-trips',
-    incidents: 'cognisafe-incidents',
+    users: 'aera-users',
+    contacts: 'aera-contacts',
+    trips: 'aera-trips',
+    incidents: 'aera-incidents',
   },
 }));
 
@@ -30,7 +30,7 @@ const { dbGet, dbPut, dbQuery, dbUpdate } = require('../lambda/shared/dynamo') a
 
 // Enable DEMO_MODE for tests to avoid real SMS
 process.env.DEMO_MODE = 'true';
-process.env.SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:123456789012:cognisafe-emergency-alerts';
+process.env.SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:123456789012:aera-emergency-alerts';
 
 import { handler } from '../lambda/incidents/handler';
 

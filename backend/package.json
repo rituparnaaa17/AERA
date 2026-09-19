@@ -1,8 +1,8 @@
 {
-  "name": "@cognisafe/backend",
+  "name": "@aera/backend",
   "version": "1.0.0",
   "private": true,
-  "description": "COGNISAFE-Q AWS Serverless Backend — CDK + Lambda + DynamoDB + Cognito + SNS",
+  "description": "AERA AWS Serverless Backend — CDK + Lambda + DynamoDB + Cognito + SNS",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",

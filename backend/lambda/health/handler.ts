@@ -6,7 +6,7 @@ const START_TIME = Date.now();
 export async function handler(_event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   return ok({
     status: 'healthy',
-    service: 'cognisafe-q-backend',
+    service: 'aera-backend',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     uptimeMs: Date.now() - START_TIME,

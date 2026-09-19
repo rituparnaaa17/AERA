@@ -1,6 +1,6 @@
-# COGNISAFE-Q Backend — AWS Serverless
+# AERA Backend — AWS Serverless
 
-Production-grade serverless backend for the COGNISAFE-Q mobile safety application.
+Production-grade serverless backend for the AERA mobile safety application.
 
 ## Architecture
 
@@ -32,10 +32,10 @@ DynamoDB        SNS → SMS (DEMO_MODE → CloudWatch)
 
 | Table | PK | GSIs |
 |---|---|---|
-| `cognisafe-users` | `userId` (Cognito sub) | — |
-| `cognisafe-contacts` | `contactId` | `userId-index` |
-| `cognisafe-trips` | `tripId` (mobile sessionId) | `userId-index` |
-| `cognisafe-incidents` | `incidentId` | `userId-index`, `clientId-index` |
+| `aera-users` | `userId` (Cognito sub) | — |
+| `aera-contacts` | `contactId` | `userId-index` |
+| `aera-trips` | `tripId` (mobile sessionId) | `userId-index` |
+| `aera-incidents` | `incidentId` | `userId-index`, `clientId-index` |
 
 ## API Endpoints
 
@@ -81,15 +81,15 @@ npm run deploy
 After deployment, CDK prints:
 ```
 Outputs:
-  CognisafeStack.ApiBaseUrl           = https://xxxx.execute-api.ap-south-1.amazonaws.com
-  CognisafeStack.UserPoolId           = ap-south-1_XXXXXXXXX
-  CognisafeStack.UserPoolClientId     = xxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  CognisafeStack.EmergencyTopicArn    = arn:aws:sns:ap-south-1:...
+  AeraStack.ApiBaseUrl           = https://xxxx.execute-api.ap-south-1.amazonaws.com
+  AeraStack.UserPoolId           = ap-south-1_XXXXXXXXX
+  AeraStack.UserPoolClientId     = xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  AeraStack.EmergencyTopicArn    = arn:aws:sns:ap-south-1:...
 ```
 
 Copy these values to:
 - `backend/.env` → `DEMO_MODE=true`
-- `artifacts/cognisafe-q/.env` → see `.env.example`
+- `artifacts/aera/.env` → see `.env.example`
 
 ## Environment Variables
 
@@ -115,7 +115,7 @@ npm run synth         # CDK CloudFormation synthesis
 DEMO_MODE logs notifications to CloudWatch. For real SMS:
 
 1. Complete [Indian DLT registration](https://www.trai.gov.in/sites/default/files/RegulationUcc19072018.pdf)
-2. Register a sender ID (e.g., `COGNISAFE`) with your telecom operator
+2. Register a sender ID (e.g., `AERA`) with your telecom operator
 3. Set `DEMO_MODE=false` in `backend/.env` and redeploy
 4. SNS sends transactional SMS to all enabled emergency contacts
 

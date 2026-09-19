@@ -51,8 +51,8 @@ export async function dbQuery<T>(input: QueryCommandInput): Promise<T[]> {
 // ─── Table name env helpers ────────────────────────────────────────────────────
 
 export const TABLES = {
-  users: process.env.USERS_TABLE ?? 'cognisafe-users',
-  contacts: process.env.CONTACTS_TABLE ?? 'cognisafe-contacts',
-  trips: process.env.TRIPS_TABLE ?? 'cognisafe-trips',
-  incidents: process.env.INCIDENTS_TABLE ?? 'cognisafe-incidents',
+  users: process.env.USERS_TABLE ?? 'aera-users',
+  contacts: process.env.CONTACTS_TABLE ?? 'aera-contacts',
+  trips: process.env.TRIPS_TABLE ?? 'aera-trips',
+  incidents: process.env.INCIDENTS_TABLE ?? 'aera-incidents',
 } as const;

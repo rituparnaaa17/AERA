@@ -9,7 +9,7 @@ describe('GET /health', () => {
     const body = JSON.parse(result.body as string);
     expect(body.success).toBe(true);
     expect(body.data.status).toBe('healthy');
-    expect(body.data.service).toBe('cognisafe-q-backend');
+    expect(body.data.service).toBe('aera-backend');
     expect(body.data.timestamp).toBeDefined();
   });
 });

@@ -1,4 +1,4 @@
-# React Native Integration Guide — COGNISAFE-Q Backend
+# React Native Integration Guide — AERA Backend
 
 This guide explains how the existing Expo React Native app integrates with the AWS backend.
 
@@ -30,7 +30,7 @@ The mobile app is **local-first**. All backend calls are:
 
 ## Environment Setup
 
-After `npx cdk deploy`, add to `artifacts/cognisafe-q/.env`:
+After `npx cdk deploy`, add to `artifacts/aera/.env`:
 
 ```bash
 EXPO_PUBLIC_API_GATEWAY_URL=https://xxxx.execute-api.ap-south-1.amazonaws.com
@@ -76,7 +76,7 @@ TripContext.sendEmergency() call (MODIFIED):
   → Returns { incidentId, notificationStatus }
 
 If network unavailable:
-  → Incident queued in AsyncStorage (@cognisafe/pending_incidents)
+  → Incident queued in AsyncStorage (@aera/pending_incidents)
   → Auto-retried on next successful API call (flushPendingIncidents)
 ```
 

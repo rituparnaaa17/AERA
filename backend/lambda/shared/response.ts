@@ -61,7 +61,7 @@ export function conflict(message: string): APIGatewayProxyResultV2 {
 
 export function internalError(message = 'Internal server error', err?: unknown): APIGatewayProxyResultV2 {
   if (err) {
-    console.error('[CognisafeError]', message, err instanceof Error ? err.stack : err);
+    console.error('[AeraError]', message, err instanceof Error ? err.stack : err);
   }
   return {
     statusCode: 500,

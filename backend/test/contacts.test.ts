@@ -13,10 +13,10 @@ jest.mock('../lambda/shared/dynamo', () => ({
   dbQuery: jest.fn(),
   dbUpdate: jest.fn(),
   TABLES: {
-    users: 'cognisafe-users',
-    contacts: 'cognisafe-contacts',
-    trips: 'cognisafe-trips',
-    incidents: 'cognisafe-incidents',
+    users: 'aera-users',
+    contacts: 'aera-contacts',
+    trips: 'aera-trips',
+    incidents: 'aera-incidents',
   },
 }));
 

@@ -1,6 +1,6 @@
-# Cognisafe-Q
+# AERA
 
-Cognisafe-Q is an Expo mobile safety companion that monitors active trips, detects abnormal motion, and escalates to a driver's emergency response circle when they cannot check in.
+AERA is an Expo mobile safety companion that monitors active trips, detects abnormal motion, and escalates to a driver's emergency response circle when they cannot check in.
 
 ## Run & Operate
 
@@ -22,10 +22,10 @@ Cognisafe-Q is an Expo mobile safety companion that monitors active trips, detec
 
 ## Where things live
 
-- `artifacts/cognisafe-q/app/` — Expo Router screens for Home, live trip, history, contacts, and settings.
-- `artifacts/cognisafe-q/components/TripContext.tsx` — shared trip state, sensor/location capture, escalation flow, and AsyncStorage persistence.
-- `artifacts/cognisafe-q/components/AppPrimitives.tsx` — shared mobile UI primitives.
-- `artifacts/cognisafe-q/constants/colors.ts` — Cognisafe-Q semantic palette.
+- `artifacts/aera/app/` — Expo Router screens for Home, live trip, history, contacts, and settings.
+- `artifacts/aera/components/TripContext.tsx` — shared trip state, sensor/location capture, escalation flow, and AsyncStorage persistence.
+- `artifacts/aera/components/AppPrimitives.tsx` — shared mobile UI primitives.
+- `artifacts/aera/constants/colors.ts` — AERA semantic palette.
 
 ## Architecture decisions
 
@@ -50,7 +50,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 - `expo-sensors` is required for native motion monitoring and is pinned to the Expo SDK 57 line.
 - `EXPO_PUBLIC_API_GATEWAY_URL` is optional for the local-first MVP; when present it should point at the existing `/predict`, `/alert`, and `/contacts` backend routes.
-- Expo preview is managed by the `artifacts/cognisafe-q: expo` workflow; do not start Metro with a bare root command.
+- Expo preview is managed by the `artifacts/aera: expo` workflow; do not start Metro with a bare root command.
 
 ## Pointers
 

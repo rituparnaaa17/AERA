@@ -145,7 +145,7 @@ async function createIncident(
 
   const confidencePct = Math.round(input.confidence * 100);
   const message = [
-    '🚨 COGNISAFE-Q EMERGENCY ALERT 🚨',
+    '🚨 AERA EMERGENCY ALERT 🚨',
     '',
     `A possible emergency was detected.`,
     '',
@@ -154,7 +154,7 @@ async function createIncident(
     `Confidence: ${confidencePct}%`,
     `Incident ID: ${incidentId}`,
     '',
-    'This is an automated safety alert from COGNISAFE-Q.',
+    'This is an automated safety alert from AERA.',
   ].join('\n');
 
   // ── Step 5: Send notifications ──────────────────────────────────────────────
@@ -188,7 +188,7 @@ async function createIncident(
               },
               'AWS.SNS.SMS.SenderID': {
                 DataType: 'String',
-                StringValue: 'COGNISAFE',
+                StringValue: 'AERA',
               },
             },
           }));
