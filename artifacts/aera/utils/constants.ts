@@ -2,7 +2,11 @@ export const WINDOW_SIZE = 150;
 export const STRIDE = 15;
 export const TARGET_SENSOR_HZ = 50;
 export const DEFAULT_COUNTDOWN_SECONDS = 30;
-export const USE_MOCK_AI = true;
+// Real sensor-based detection is the default.
+// Mock AI can be enabled via Settings → Developer → Mock AI toggle.
+// When false: ML API call is made (advisory, may return null if no /predict endpoint).
+// Detection engine (rolling window + risk scoring) runs regardless of this flag.
+export const USE_MOCK_AI = false;
 
 // ─── AWS Backend Configuration ────────────────────────────────────────────────
 // Set these in your .env file after running `npx cdk deploy`

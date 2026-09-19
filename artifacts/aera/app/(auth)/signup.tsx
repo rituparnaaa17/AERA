@@ -33,10 +33,12 @@ import { signUp, confirmSignUp, resendConfirmationCode, mapCognitoError } from '
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
   const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -55,7 +57,11 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!name.trim() || !email.trim() || !password) {
-      setError('Please fill in every field.');
+      setError('Please fill in required fields.');
+      return;
+    }
+    if (phone.trim() && !/^\+[1-9]\d{1,14}$/.test(phone.trim())) {
+      setError('Phone number must be in E.164 format (e.g. +919876543210).');
       return;
     }
     if (password.length < 8) {
@@ -65,7 +71,7 @@ export default function SignupScreen() {
     setError('');
     setLoading(true);
     try {
-      await signUp(email.trim().toLowerCase(), password, name.trim());
+      await signUp(email.trim().toLowerCase(), password, name.trim(), phone.trim() || undefined);
       setShowConfirm(true);
     } catch (err: unknown) {
       setError(mapCognitoError(err));
@@ -174,6 +180,18 @@ export default function SignupScreen() {
                   onChangeText={setEmail}
                   placeholder="you@example.com"
                   keyboardType="email-address"
+                  autoCapitalize="none"
+                  returnKeyType="next"
+                  onSubmitEditing={() => phoneRef.current?.focus()}
+                />
+                <AuthField
+                  ref={phoneRef}
+                  label="PHONE NUMBER (OPTIONAL)"
+                  icon="phone"
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="+919876543210"
+                  keyboardType="phone-pad"
                   autoCapitalize="none"
                   returnKeyType="next"
                   onSubmitEditing={() => passwordRef.current?.focus()}

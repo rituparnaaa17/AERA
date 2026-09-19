@@ -22,7 +22,13 @@ const PENDING_INCIDENTS_KEY = '@aera/pending_incidents';
 
 export interface EmergencyAlertParams {
   sessionId: string;
-  location: { lat: number; lng: number } | null;
+  location: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+    speed?: number;
+    heading?: number;
+  } | null;
   timestamp: string;
   notifyEmergencyServices: boolean;
   confidence?: number;
@@ -36,8 +42,6 @@ interface PendingIncident {
 /**
  * Sends an emergency escalation to POST /incidents.
  * Falls back to local queue if network unavailable.
- *
- * REPLACES the old POST /alert endpoint.
  */
 export async function sendEmergencyAlert(params: EmergencyAlertParams): Promise<boolean> {
   const clientIncidentId = `${params.sessionId}-${Date.now()}`;
@@ -46,11 +50,16 @@ export async function sendEmergencyAlert(params: EmergencyAlertParams): Promise<
     tripId: params.sessionId,
     clientIncidentId,
     status: 'EMERGENCY',
-    confidence: params.confidence ?? 0.91,
+    // Use the real confidence from the decision engine. Never fabricate a value.
+    // If confidence is undefined (legacy path), send 0 so backend knows it is unknown.
+    confidence: params.confidence ?? 0,
     location: params.location
       ? {
           latitude: params.location.lat,
           longitude: params.location.lng,
+          accuracy: params.location.accuracy,
+          speed: params.location.speed,
+          heading: params.location.heading,
         }
       : undefined,
     detectedAt: params.timestamp,

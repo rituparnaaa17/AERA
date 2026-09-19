@@ -124,7 +124,7 @@ export default function HomeDashboard() {
               {getGreeting()}, Driver <Text style={styles.wave}>👋</Text>
             </Text>
             <Text style={styles.greetingSub}>
-              <Text style={styles.qMark}>Q</Text> is keeping an eye on your journey.
+              <Text style={styles.qMark}>AERA</Text> is keeping an eye on your journey.
             </Text>
           </View>
           <Pressable

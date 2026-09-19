@@ -34,19 +34,25 @@ function RootLayoutNav() {
   // ── Auth guard ────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkAuth = async () => {
-      const session = await getCurrentSession();
-      const authenticated = session !== null;
-      setIsAuthenticated(authenticated);
-      setAuthChecked(true);
+      try {
+        const session = await getCurrentSession();
+        const authenticated = session !== null;
+        setIsAuthenticated(authenticated);
+        setAuthChecked(true);
 
-      const inAuthGroup = segments[0] === '(auth)';
+        const inAuthGroup = segments[0] === '(auth)';
 
-      if (!authenticated && !inAuthGroup) {
-        // Not logged in and not in auth screens → send to login
+        if (!authenticated && !inAuthGroup) {
+          // Not logged in and not in auth screens → send to login
+          router.replace('/(auth)/login');
+        } else if (authenticated && inAuthGroup) {
+          // Logged in but still on auth screens → send to main app
+          router.replace('/(tabs)');
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
+        setAuthChecked(true);
         router.replace('/(auth)/login');
-      } else if (authenticated && inAuthGroup) {
-        // Logged in but still on auth screens → send to main app
-        router.replace('/(tabs)');
       }
     };
     void checkAuth();

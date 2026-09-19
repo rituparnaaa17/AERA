@@ -1,13 +1,24 @@
 /**
- * Trip Complete — Batch 3B (reference screen 13)
+ * Trip Complete — AERA
  *
- * Score ring, celebration mascot, real trip stats from `useTrip().lastCompletedTrip`.
- * Score band is derived (safe=96, alert=78, emergency=52) matching the previous
- * band logic — no fabricated numbers.
+ * Shows a Trip Safety Score derived from whether the trip had alerts or
+ * emergencies. This is a SAFETY RATING BAND — not raw AI confidence.
+ *
+ * Score bands:
+ *   96 = Clean trip (no alerts)
+ *   78 = Trip had potential risk alerts
+ *   52 = Emergency was triggered
+ *
+ * The score label is "Trip Safety Score" — never shown as "AI confidence".
+ * Real detection confidence is separately shown in the Events section if
+ * the trip had incidents.
+ *
+ * All displayed values come from lastCompletedTrip which is recorded from
+ * real sensor data during the trip.
  */
 
 import React, { useEffect, useRef } from 'react';
-import { Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,6 +51,10 @@ export default function TripCompleteScreen() {
     ? lastCompletedTrip.alertCount ?? lastCompletedTrip.events.filter((e) => e.status === 'ALERT').length
     : 0;
   const emergencies = lastCompletedTrip?.emergencyTriggered ? 1 : 0;
+
+  // Trip Safety Score — a BAND based on what happened during the trip.
+  // This is NOT raw AI confidence. It is a safety rating.
+  // 96 = safe trip, 78 = had alerts, 52 = emergency triggered
   const score = !lastCompletedTrip
     ? 0
     : lastCompletedTrip.emergencyTriggered
@@ -47,6 +62,7 @@ export default function TripCompleteScreen() {
     : alerts
     ? 78
     : 96;
+
   const scoreColor = score >= 90 ? SAFE : score >= 70 ? WARN : DANGER;
   const scoreLabel = score >= 90 ? 'Excellent' : score >= 70 ? 'Good' : 'Needs Review';
 
@@ -83,8 +99,9 @@ export default function TripCompleteScreen() {
           <Text style={styles.sub}>Your monitored drive has been saved to trip history.</Text>
         </View>
 
-        {/* Q Safety Halo */}
+        {/* Trip Safety Score (safety rating band — not AI confidence) */}
         <View style={styles.scoreCard}>
+          <Text style={styles.scoreSectionLabel}>TRIP SAFETY SCORE</Text>
           <QSafetyHalo
             value={score}
             size={200}
@@ -95,27 +112,44 @@ export default function TripCompleteScreen() {
             centerColor={scoreColor}
             captionColor={NAVY_SOFT}
           />
+          <Text style={styles.scoreNote}>
+            {lastCompletedTrip.emergencyTriggered
+              ? 'Emergency was triggered during this trip.'
+              : alerts > 0
+              ? 'Potential risks were detected but no emergency was needed.'
+              : 'No safety alerts were triggered on this trip.'}
+          </Text>
         </View>
 
-        {/* Distance + duration */}
+        {/* Distance + duration — real values from trip */}
         <View style={styles.metricsRow}>
           <MetricTile label="Distance" value={`${lastCompletedTrip.distance.toFixed(1)}`} unit="km" />
           <MetricTile label="Duration" value={`${durationMin}`} unit="min" />
         </View>
 
-        {/* Stats */}
+        {/* Stats — all real, from trip record */}
         <View style={styles.statsCard}>
-          <StatRow icon="shield" label="Safe Windows" value={`${lastCompletedTrip.safeWindows ?? 0}`} color={SAFE} />
+          <StatRow
+            icon="shield"
+            label="Safe Windows"
+            value={lastCompletedTrip.safeWindows != null ? `${lastCompletedTrip.safeWindows}` : 'N/A'}
+            color={SAFE}
+          />
           <View style={styles.statDivider} />
           <StatRow icon="alert-triangle" label="Alerts" value={`${alerts}`} color={alerts > 0 ? WARN : MUTED} />
           <View style={styles.statDivider} />
-          <StatRow icon="alert-octagon" label="Emergencies" value={`${emergencies}`} color={emergencies > 0 ? DANGER : MUTED} />
+          <StatRow
+            icon="alert-octagon"
+            label="Emergencies"
+            value={`${emergencies}`}
+            color={emergencies > 0 ? DANGER : MUTED}
+          />
         </View>
 
         {/* Actions */}
         <View style={styles.actions}>
           <PrimaryButton
-            label="View Trip Summary"
+            label="View Trip Details"
             onPress={() => {
               const id = lastCompletedTrip.id;
               // Navigate FIRST, then dismiss on the next tick so summary's
@@ -200,6 +234,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 2,
+    gap: 8,
+  },
+  scoreSectionLabel: {
+    color: MUTED,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  scoreNote: {
+    color: NAVY_SOFT,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 8,
   },
 
   metricsRow: { flexDirection: 'row', gap: 10 },

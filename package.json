@@ -11,7 +11,8 @@
   "private": true,
   "dependencies": {
     "@replit/connectors-sdk": "^0.4.3",
-    "expo": "^57.0.24"
+    "expo": "^57.0.24",
+    "lightningcss-win32-x64-msvc": "1.32.0"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

@@ -139,23 +139,27 @@ async function createIncident(
   // ── Step 4: Build notification message ─────────────────────────────────────
   const lat = input.location?.latitude;
   const lng = input.location?.longitude;
+  const speedMs = input.location?.speed;
+  const accuracy = input.location?.accuracy;
   const locationUrl = (lat !== undefined && lng !== undefined)
     ? `https://maps.google.com/?q=${lat},${lng}`
     : 'Location unavailable';
 
+  const speedKmh = speedMs !== undefined && speedMs >= 0 ? Math.round(speedMs * 3.6) : null;
   const confidencePct = Math.round(input.confidence * 100);
+
   const message = [
     '🚨 AERA EMERGENCY ALERT 🚨',
     '',
-    `A possible emergency was detected.`,
-    '',
-    `User: ${userName}`,
+    `Safety alert for ${userName}.`,
     `Location: ${locationUrl}`,
+    accuracy !== undefined ? `Accuracy: ±${Math.round(accuracy)}m` : null,
+    speedKmh !== null ? `Speed: ${speedKmh} km/h` : null,
     `Confidence: ${confidencePct}%`,
-    `Incident ID: ${incidentId}`,
+    `Incident ID: ${incidentId.slice(0, 8)}`,
     '',
-    'This is an automated safety alert from AERA.',
-  ].join('\n');
+    'Reply or open link for live tracking. Automated by AERA Safety.',
+  ].filter((line) => line !== null).join('\n');
 
   // ── Step 5: Send notifications ──────────────────────────────────────────────
   let finalStatus: NotificationStatus = 'SENT';

@@ -33,6 +33,7 @@ import { Mascot } from '@/components/Mascot';
 import { SensorGrid } from '@/components/SensorTiles';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import { useTrip } from '@/components/TripContext';
+import { SensorDebugPanel } from '@/components/SensorDebugPanel';
 
 const NAVY = '#0F1E4A';
 const NAVY_SOFT = '#334155';
@@ -58,7 +59,6 @@ export default function LiveTripScreen() {
     confidence,
     stopTrip,
     triggerManualSos,
-    permissionGranted,
     settings,
     networkAvailable,
     windowsProcessed,
@@ -187,7 +187,6 @@ export default function LiveTripScreen() {
         {/* ── Sensor Health ── */}
         <Text style={styles.sectionTitle}>Sensor Health</Text>
         <SensorGrid
-          locationReady={permissionGranted === true}
           isMockAi={settings.mockAi}
           isOffline={!networkAvailable}
           windowsProcessed={windowsProcessed}
@@ -210,6 +209,10 @@ export default function LiveTripScreen() {
             />
           </View>
         </View>
+
+        {/* ── Diagnostics Debug Panel ── */}
+        <Text style={[styles.sectionTitle, { marginTop: 6 }]}>Real-Time Diagnostics</Text>
+        <SensorDebugPanel />
       </ScrollView>
     </AppBackground>
   );

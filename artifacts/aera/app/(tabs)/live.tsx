@@ -26,7 +26,6 @@ export default function LiveTabScreen() {
     speedKmh,
     elapsedSeconds,
     distanceKm,
-    permissionGranted,
     startTrip,
     windowsProcessed,
     settings,
@@ -83,7 +82,6 @@ export default function LiveTabScreen() {
                 const started = await startTrip();
                 if (started) router.push('/trip');
               }}
-              disabled={permissionGranted === null}
             >
               Start Monitoring
             </PrimaryButton>
@@ -161,7 +159,6 @@ export default function LiveTabScreen() {
           <View style={styles.section}>
             <SectionHeader title="Sensor Health" />
             <SensorGrid
-              locationReady={permissionGranted === true}
               isMockAi={settings.mockAi}
               isOffline={!networkAvailable}
               windowsProcessed={windowsProcessed}

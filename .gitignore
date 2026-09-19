@@ -6,6 +6,8 @@ tmp
 out-tsc
 build/
 web-build/
+cdk.out/
+backend/cdk.out/
 *.tsbuildinfo
 
 # ── Expo / React Native ───────────────────────────────────────────────

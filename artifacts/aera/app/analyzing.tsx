@@ -42,9 +42,9 @@ export default function AnalyzingScreen() {
     confidence,
     windowsProcessed,
     status,
-    permissionGranted,
     networkAvailable,
     settings,
+    diagnostics,
   } = useTrip();
 
   const isAnalyzing = tripActive && confidence == null;
@@ -108,9 +108,9 @@ export default function AnalyzingScreen() {
                 style={styles.mascot}
                 resizeMode="contain"
               />
-              <Text style={styles.confLabel}>Confidence</Text>
+              <Text style={styles.confLabel}>Detection</Text>
               <Text style={[styles.confValue, { color: haloColor }]}>
-                {confidence != null ? `${Math.round(confidence * 100)}%` : `${displayValue}%`}
+                {confidence != null ? `${Math.round(confidence * 100)}%` : isAnalyzing ? '…' : 'N/A'}
               </Text>
             </View>
           </QSafetyHalo>
@@ -122,13 +122,23 @@ export default function AnalyzingScreen() {
 
         {/* Diagnostic chips */}
         <View style={styles.chipsGrid}>
-          <DiagChip icon="activity" label="Motion" status="active" note="Sampling" />
-          <DiagChip icon="refresh-cw" label="Gyro" status="active" note="Stable" />
+          <DiagChip
+            icon="activity"
+            label="Motion"
+            status={diagnostics.accelActive ? 'active' : 'warn'}
+            note={diagnostics.accelActive ? `${diagnostics.accelMagnitude.toFixed(2)}g` : 'Inactive'}
+          />
+          <DiagChip
+            icon="refresh-cw"
+            label="Gyro"
+            status={diagnostics.gyroActive ? 'active' : 'warn'}
+            note={diagnostics.gyroActive ? `${diagnostics.gyroMagnitude.toFixed(2)} r/s` : 'Inactive'}
+          />
           <DiagChip
             icon="map-pin"
             label="GPS"
-            status={permissionGranted ? 'active' : 'warn'}
-            note={permissionGranted ? 'Locked' : 'Waiting'}
+            status={diagnostics.gpsActive ? 'active' : 'warn'}
+            note={diagnostics.gpsActive ? `±${diagnostics.gpsAccuracy !== null ? Math.round(diagnostics.gpsAccuracy) : '?'}m` : 'Acquiring…'}
           />
           <DiagChip
             icon="cpu"

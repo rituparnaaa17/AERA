@@ -67,7 +67,7 @@ export class AeraStack extends cdk.Stack {
       partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
@@ -76,7 +76,7 @@ export class AeraStack extends cdk.Stack {
       partitionKey: { name: 'contactId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
     contactsTable.addGlobalSecondaryIndex({
@@ -89,8 +89,10 @@ export class AeraStack extends cdk.Stack {
       partitionKey: { name: 'tripId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      // TTL: auto-delete trips older than 90 days; keeps storage costs near zero
+      timeToLiveAttribute: 'ttl',
     });
     tripsTable.addGlobalSecondaryIndex({
       indexName: 'userId-index',
@@ -102,8 +104,10 @@ export class AeraStack extends cdk.Stack {
       partitionKey: { name: 'incidentId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      // TTL: auto-delete resolved incidents older than 1 year
+      timeToLiveAttribute: 'ttl',
     });
     incidentsTable.addGlobalSecondaryIndex({
       indexName: 'userId-index',
@@ -139,29 +143,76 @@ export class AeraStack extends cdk.Stack {
     // ─────────────────────────────────────────────
     // LAMBDA FUNCTIONS
     // ─────────────────────────────────────────────
+    // Explicit log group: avoids the deprecated logRetention custom resource Lambda
+    const lambdaLogGroup = new logs.LogGroup(this, 'AeraLambdaLogGroup', {
+      retention: logs.RetentionDays.THREE_DAYS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     const lambdaDefaults: Omit<lambda.FunctionProps, 'handler' | 'code'> = {
       runtime: lambda.Runtime.NODEJS_20_X,
       architecture: lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(29),
-      memorySize: 256,
+      // 128 MB is sufficient for DynamoDB/SNS fanout; saves ~50% Lambda cost
+      memorySize: 128,
       environment: lambdaEnv,
-      logRetention: logs.RetentionDays.ONE_WEEK,
+      // Explicit log group with 3-day retention (no deprecated logRetention custom resource)
+      logGroup: lambdaLogGroup,
       tracing: lambda.Tracing.ACTIVE,
     };
+
+    // ─────────────────────────────────────────────
+    // LAMBDA DEPLOYMENT PACKAGE
+    // ─────────────────────────────────────────────
+    // On Windows, CDK Docker-based bundling requires Docker Desktop.
+    // We use a LOCAL bundler strategy instead:
+    //   1. `npm run build` (tsc) pre-compiles all Lambda handlers to dist/lambda/
+    //   2. CDK uploads dist/lambda/ + node_modules as the deployment package
+    // This eliminates Docker as a build dependency and works on all platforms.
+    const lambdaCode = lambda.Code.fromAsset(path.join(__dirname, '..'), {
+      bundling: {
+        // Local bundler: runs tsc + copies artifacts on the host machine
+        local: {
+          tryBundle(outputDir: string) {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const cp = require('child_process') as typeof import('child_process');
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const fs = require('fs') as typeof import('fs');
+            const cwd = path.join(__dirname, '..');
+            try {
+              // Step 1: Compile TypeScript handlers
+              cp.execSync('npm run build', { cwd, stdio: 'inherit' });
+              // Step 2: Copy compiled lambda JS to asset output
+              const distLambda = path.join(cwd, 'dist', 'lambda');
+              fs.cpSync(distLambda, outputDir, { recursive: true });
+              // Step 3: Copy node_modules into asset output
+              fs.cpSync(path.join(cwd, 'node_modules'), path.join(outputDir, 'node_modules'), { recursive: true });
+              return true;
+            } catch {
+              return false;
+            }
+          },
+        },
+        // Fallback: Docker image (used in CI with Docker available)
+        image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+        command: [
+          'bash', '-c',
+          [
+            'npm ci --omit=dev',
+            'npx tsc --project tsconfig.json',
+            'cp -r dist/lambda/* /asset-output/',
+            'cp -r node_modules /asset-output/',
+          ].join(' && '),
+        ],
+      },
+    });
+
 
     const healthFn = new lambda.Function(this, 'HealthFn', {
       ...lambdaDefaults,
       functionName: 'aera-health',
       handler: 'health/handler.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda'), {
-        bundling: {
-          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
-          command: [
-            'bash', '-c',
-            'npm ci --omit=dev && npx tsc --project tsconfig.json && cp -r dist/lambda/* /asset-output/ && cp -r node_modules /asset-output/',
-          ],
-        },
-      }),
+      code: lambdaCode,
       description: 'GET /health — public health check',
     });
 
@@ -169,15 +220,7 @@ export class AeraStack extends cdk.Stack {
       ...lambdaDefaults,
       functionName: 'aera-profile',
       handler: 'profile/handler.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda'), {
-        bundling: {
-          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
-          command: [
-            'bash', '-c',
-            'npm ci --omit=dev && npx tsc --project tsconfig.json && cp -r dist/lambda/* /asset-output/ && cp -r node_modules /asset-output/',
-          ],
-        },
-      }),
+      code: lambdaCode,
       description: 'GET/PUT /profile — user profile management',
     });
 
@@ -185,15 +228,7 @@ export class AeraStack extends cdk.Stack {
       ...lambdaDefaults,
       functionName: 'aera-contacts',
       handler: 'contacts/handler.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda'), {
-        bundling: {
-          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
-          command: [
-            'bash', '-c',
-            'npm ci --omit=dev && npx tsc --project tsconfig.json && cp -r dist/lambda/* /asset-output/ && cp -r node_modules /asset-output/',
-          ],
-        },
-      }),
+      code: lambdaCode,
       description: 'GET/POST/DELETE /contacts — emergency contacts CRUD',
     });
 
@@ -201,15 +236,7 @@ export class AeraStack extends cdk.Stack {
       ...lambdaDefaults,
       functionName: 'aera-trips',
       handler: 'trips/handler.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda'), {
-        bundling: {
-          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
-          command: [
-            'bash', '-c',
-            'npm ci --omit=dev && npx tsc --project tsconfig.json && cp -r dist/lambda/* /asset-output/ && cp -r node_modules /asset-output/',
-          ],
-        },
-      }),
+      code: lambdaCode,
       description: 'GET/POST/PUT /trips — trip persistence',
     });
 
@@ -217,15 +244,7 @@ export class AeraStack extends cdk.Stack {
       ...lambdaDefaults,
       functionName: 'aera-incidents',
       handler: 'incidents/handler.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda'), {
-        bundling: {
-          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
-          command: [
-            'bash', '-c',
-            'npm ci --omit=dev && npx tsc --project tsconfig.json && cp -r dist/lambda/* /asset-output/ && cp -r node_modules /asset-output/',
-          ],
-        },
-      }),
+      code: lambdaCode,
       description: 'GET/POST /incidents — incident escalation + SNS orchestration',
     });
 

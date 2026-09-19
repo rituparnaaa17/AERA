@@ -72,9 +72,16 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           Something went wrong
         </Text>
 
-        <Text style={[styles.message, { color: colors.mutedForeground }]}>
-          Please reload the app to continue.
+        <Text style={[styles.message, { color: '#FF4D4D', fontFamily: monoFont }]}>
+          {error?.message || 'Unknown error'}
         </Text>
+        {error?.stack ? (
+          <ScrollView style={{ maxHeight: 150, width: '100%', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 8, marginVertical: 8 }}>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: monoFont }}>
+              {error.stack.slice(0, 500)}
+            </Text>
+          </ScrollView>
+        ) : null}
 
         <Pressable
           onPress={handleRestart}

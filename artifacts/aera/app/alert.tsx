@@ -57,7 +57,10 @@ export default function RiskAlertScreen() {
       Animated.timing(shake, { toValue: -5, duration: 60, useNativeDriver: true }),
       Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: true }),
     ]).start();
-    return () => pulse.stopAnimation();
+    return () => {
+      pulse.stopAnimation();
+      shake.stopAnimation();
+    };
   }, [pulse, shake]);
 
   const countdownMax = settings.countdownSeconds ?? DEFAULT_COUNTDOWN;

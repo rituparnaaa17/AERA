@@ -20,9 +20,22 @@ import React, { useMemo } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-// Static import guarded by Platform. On web these will still be pulled by
-// Metro's tree-shake; we render null before touching them.
-import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
+let MapView: any = View;
+let Marker: any = View;
+let Polyline: any = View;
+let UrlTile: any = View;
+
+if (Platform.OS !== 'web') {
+  try {
+    const Maps = require('react-native-maps');
+    MapView = Maps.default;
+    Marker = Maps.Marker;
+    Polyline = Maps.Polyline;
+    UrlTile = Maps.UrlTile;
+  } catch (e) {
+    console.warn('react-native-maps failed to load:', e);
+  }
+}
 
 type Sample = { lat: number; lng: number };
 
