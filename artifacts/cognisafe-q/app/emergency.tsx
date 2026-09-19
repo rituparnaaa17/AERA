@@ -146,7 +146,7 @@ export default function EmergencyScreen() {
         <View style={styles.statusCard}>
           <ChecklistItem
             icon="map-pin"
-            text={locationDone ? 'Location acquired' : 'Acquiring location…'}
+            text={locationDone ? 'Location permission granted' : 'Location permission required'}
             done={locationDone}
           />
           <Divider />
