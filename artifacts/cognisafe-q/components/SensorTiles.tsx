@@ -114,7 +114,7 @@ function AccelerometerViz() {
         stroke={BRAND}
         strokeWidth={2}
         fill="none"
-        translateX={translateX as unknown as number}
+        style={{ transform: [{ translateX }] }}
       />
       {/* Zero axis */}
       <Line x1={0} y1={18} x2={100} y2={18} stroke={CARD_BORDER} strokeWidth={1} />
