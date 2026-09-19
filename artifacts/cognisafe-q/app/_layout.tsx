@@ -57,17 +57,35 @@ function RootLayoutNav() {
   // ── Emergency navigation ──────────────────────────────────────────────────
   useEffect(() => {
     if (!tripActive) return;
+    // Companion routes users may open FROM an emergency (map, analytics
+    // etc.) — do not bounce them back to /emergency while they're on one.
+    const emergencyCompanions = new Set([
+      '/emergency',
+      '/live-location',
+      '/analyzing',
+      '/summary',
+    ]);
     if (status === 'ALERT' && pathname !== '/alert') router.replace('/alert');
-    if (status === 'EMERGENCY' && pathname !== '/emergency') router.replace('/emergency');
+    if (status === 'EMERGENCY' && !emergencyCompanions.has(pathname)) {
+      router.replace('/emergency');
+    }
   }, [pathname, router, status, tripActive]);
 
   if (!authChecked) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="trip" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="analyzing" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="analytics" options={{ headerShown: false }} />
+      <Stack.Screen name="profile" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ headerShown: false }} />
+      <Stack.Screen name="offline" options={{ headerShown: false }} />
+      <Stack.Screen name="about" options={{ headerShown: false }} />
+      <Stack.Screen name="live-location" options={{ headerShown: false }} />
       <Stack.Screen name="alert" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
       <Stack.Screen name="emergency" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
       <Stack.Screen name="summary" options={{ headerShown: false, presentation: 'fullScreenModal' }} />

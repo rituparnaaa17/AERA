@@ -1,168 +1,196 @@
 /**
- * Alert Screen — Full-screen amber warning with countdown
- * Triggered when AI detects unusual motion. Driver must confirm safe.
+ * Risk Alert — Batch 3B (reference screen 10)
+ *
+ * Triggered from TripContext when the model flags a window as ALERT. The
+ * driver has `alertSecondsLeft` to confirm they're safe, otherwise the
+ * root layout escalates to Emergency.
  */
 
-import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PrimaryButton } from '@/components/AppPrimitives';
-import { useTrip } from '@/components/TripContext';
-import { useColors } from '@/hooks/useColors';
+import {
+  Animated,
+  Easing,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppBackground } from '@/components/AppBackground';
+import { Mascot } from '@/components/Mascot';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { useTrip } from '@/components/TripContext';
 
-export default function AlertScreen() {
-  const colors = useColors();
+const NAVY = '#0F1E4A';
+const NAVY_SOFT = '#334155';
+const MUTED = '#64748B';
+const WARN = '#F59E0B';
+const WARN_BG = '#FEF3C7';
+const WARN_BORDER = '#FDE68A';
+const CARD_BORDER = '#E2ECF7';
+
+const DEFAULT_COUNTDOWN = 30;
+
+export default function RiskAlertScreen() {
   const insets = useSafeAreaInsets();
-  const { confidence, alertSecondsLeft, acknowledgeOk, triggerManualSos } = useTrip();
+  const { confidence, alertSecondsLeft, acknowledgeOk, triggerManualSos, settings } = useTrip();
 
-  // Pulse warning icon
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
+  const shake = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Pulse
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.12, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.12, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true }),
       ])
     ).start();
-    // Haptic on mount
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    // Shake effect on mount
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 6, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -6, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: -8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 5, duration: 60, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: -5, duration: 60, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: true }),
     ]).start();
-    return () => pulseAnim.stopAnimation();
-  }, [pulseAnim, shakeAnim]);
+    return () => pulse.stopAnimation();
+  }, [pulse, shake]);
 
-  const confidencePct = Math.round((confidence ?? 0.89) * 100);
+  const countdownMax = settings.countdownSeconds ?? DEFAULT_COUNTDOWN;
+  const progressPct = Math.max(0, Math.min(100, (alertSecondsLeft / countdownMax) * 100));
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: '#FFFBEB', paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 },
-      ]}
-    >
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <Text style={[styles.eyebrow, { color: colors.warning }]}>⚠ POTENTIAL RISK</Text>
-        <Text style={[styles.eyebrowSub, { color: colors.text3 }]}>COGNISAFE-Q AI DETECTION</Text>
-      </View>
-
-      {/* ── Warning icon ── */}
-      <Animated.View style={[styles.iconWrap, { transform: [{ scale: pulseAnim }, { translateX: shakeAnim }] }]}>
-        <View style={[styles.iconOuter, { borderColor: colors.warningBorder }]}>
-          <View style={[styles.iconInner, { backgroundColor: colors.warning }]}>
-            <Feather name="alert-triangle" size={40} color="#FFFFFF" />
+    <AppBackground fadeStrength="default">
+      <StatusBar barStyle="dark-content" />
+      <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}>
+        <View style={styles.header}>
+          <View style={styles.eyebrowRow}>
+            <Feather name="alert-triangle" size={16} color={WARN} />
+            <Text style={styles.eyebrow}>POTENTIAL RISK</Text>
           </View>
+          <Text style={styles.subEyebrow}>COGNISAFE-Q AI DETECTION</Text>
         </View>
-      </Animated.View>
 
-      {/* ── Main message ── */}
-      <Text style={[styles.title, { color: colors.text1 }]}>Unusual Motion{'\n'}Detected</Text>
-      <Text style={[styles.subtitle, { color: colors.text3 }]}>Are you okay? Please confirm below.</Text>
+        <Animated.View style={{ transform: [{ scale: pulse }, { translateX: shake }] }}>
+          <Mascot size={168} pose="alert" />
+        </Animated.View>
 
-      {/* ── Countdown ── */}
-      <View style={[styles.countdownCard, { backgroundColor: colors.warningBackground, borderColor: colors.warningBorder }]}>
-        <Text style={[styles.countdownNum, { color: colors.warning }]}>{alertSecondsLeft}</Text>
-        <Text style={[styles.countdownLabel, { color: colors.text2 }]}>SECONDS REMAINING</Text>
-        {/* Progress bar */}
-        <View style={[styles.progressBg, { backgroundColor: colors.warningBorder }]}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: colors.warning,
-                width: `${(alertSecondsLeft / 30) * 100}%`,
-              },
-            ]}
+        <Text style={styles.title}>Potential Risk Detected</Text>
+        <Text style={styles.sub}>I noticed some unusual movement.</Text>
+
+        {/* Countdown card */}
+        <View style={styles.countdownCard}>
+          <Text style={styles.countdownNum}>{alertSecondsLeft}</Text>
+          <Text style={styles.countdownLabel}>seconds</Text>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+          </View>
+          <Text style={styles.countdownQuestion}>Are you okay?</Text>
+        </View>
+
+        {/* Detection detail — only show what we actually have. Confidence
+             may be null for a manual/mock alert; hide the whole card in
+             that case so we never fabricate a percentage.  */}
+        {confidence != null && (
+          <View style={styles.detailCard}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>AI Confidence</Text>
+              <Text style={styles.detailValue}>
+                {Math.round(confidence * 100)}%
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <PrimaryButton
+            label="I'm OK — I'm Safe"
+            onPress={() => { acknowledgeOk(); router.replace('/trip'); }}
+            style={styles.actionBtn}
+            testID="im-ok"
           />
+          <Pressable
+            onPress={() => {
+              void triggerManualSos();
+              router.replace('/emergency');
+            }}
+            style={styles.sosBtn}
+            accessibilityRole="button"
+          >
+            <Feather name="alert-octagon" size={16} color="#B91C1C" />
+            <Text style={styles.sosText}>Send SOS</Text>
+          </Pressable>
         </View>
       </View>
-
-      {/* ── AI details ── */}
-      <View style={[styles.aiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.aiRow}>
-          <View>
-            <Text style={[styles.aiLabel, { color: colors.text3 }]}>AI CONFIDENCE</Text>
-            <Text style={[styles.aiValue, { color: colors.text1 }]}>{confidencePct}%</Text>
-          </View>
-          <View style={[styles.confidenceBar, { backgroundColor: colors.muted }]}>
-            <View style={[styles.confidenceFill, { width: `${confidencePct}%`, backgroundColor: colors.warning }]} />
-          </View>
-        </View>
-        <View style={[styles.aiDivider, { backgroundColor: colors.border }]} />
-        <Text style={[styles.aiDetected, { color: colors.text3 }]}>DETECTED PATTERNS</Text>
-        {['Sudden acceleration detected', 'Increased rotational movement', 'Unusual motion pattern'].map((d) => (
-          <View key={d} style={styles.detectionRow}>
-            <Feather name="check-circle" size={13} color={colors.warning} />
-            <Text style={[styles.detectionText, { color: colors.text2 }]}>{d}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* ── Actions ── */}
-      <View style={styles.actions}>
-        <PrimaryButton
-          icon="check"
-          onPress={() => { acknowledgeOk(); router.replace('/trip'); }}
-          variant="safe"
-          testID="im-ok"
-        >
-          I'm OK — I'm Safe
-        </PrimaryButton>
-        <Pressable
-          onPress={() => void triggerManualSos()}
-          style={[styles.sosBtn, { borderColor: colors.warningBorder }]}
-        >
-          <Feather name="shield" size={18} color={colors.destructive} />
-          <Text style={[styles.sosBtnText, { color: colors.destructive }]}>Send Emergency Alert</Text>
-        </Pressable>
-      </View>
-    </View>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 24 },
-  header: { alignItems: 'center', marginBottom: 24 },
-  eyebrow: { fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  eyebrowSub: { fontSize: 10, letterSpacing: 1.5, fontWeight: '600', marginTop: 2 },
+  container: { flex: 1, paddingHorizontal: 24, alignItems: 'center', gap: 12 },
 
-  iconWrap: { alignSelf: 'center', marginBottom: 24 },
-  iconOuter: { width: 120, height: 120, borderRadius: 60, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  iconInner: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 },
+  header: { alignItems: 'center', gap: 4 },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  eyebrow: { color: WARN, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  subEyebrow: { color: MUTED, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
 
-  title: { fontSize: 34, fontWeight: '800', letterSpacing: -1, textAlign: 'center', lineHeight: 38, marginBottom: 8 },
-  subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  title: { color: NAVY, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, textAlign: 'center' },
+  sub: { color: NAVY_SOFT, fontSize: 14, textAlign: 'center' },
 
-  countdownCard: { borderRadius: 22, borderWidth: 1.5, padding: 22, alignItems: 'center', gap: 6, marginBottom: 16 },
-  countdownNum: { fontSize: 80, fontWeight: '900', letterSpacing: -3, lineHeight: 84 },
-  countdownLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
-  progressBg: { width: '100%', height: 6, borderRadius: 6, overflow: 'hidden', marginTop: 6 },
-  progressFill: { height: '100%', borderRadius: 6 },
+  countdownCard: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    backgroundColor: WARN_BG,
+    borderColor: WARN_BORDER,
+    borderWidth: 1.5,
+    borderRadius: 22,
+    padding: 20,
+    gap: 6,
+  },
+  countdownNum: { color: WARN, fontSize: 72, fontWeight: '900', letterSpacing: -3, lineHeight: 76 },
+  countdownLabel: { color: NAVY_SOFT, fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' },
+  progressTrack: {
+    alignSelf: 'stretch',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FDE68A',
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  progressFill: { height: 6, borderRadius: 3, backgroundColor: WARN },
+  countdownQuestion: { color: NAVY, fontSize: 15, fontWeight: '700', marginTop: 8 },
 
-  aiCard: { borderRadius: 18, borderWidth: 1.5, padding: 16, gap: 10, marginBottom: 20 },
-  aiRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  aiLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  aiValue: { fontSize: 22, fontWeight: '800' },
-  confidenceBar: { flex: 1, height: 8, borderRadius: 6, overflow: 'hidden' },
-  confidenceFill: { height: '100%', borderRadius: 6 },
-  aiDivider: { height: 1 },
-  aiDetected: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  detectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detectionText: { fontSize: 13 },
+  detailCard: {
+    alignSelf: 'stretch',
+    backgroundColor: '#FFFFFF',
+    borderColor: CARD_BORDER,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    gap: 6,
+  },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  detailLabel: { color: MUTED, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  detailValue: { color: NAVY, fontSize: 20, fontWeight: '900' },
+  detailNote: { color: NAVY_SOFT, fontSize: 12, lineHeight: 18 },
 
-  actions: { gap: 12, marginTop: 'auto' },
-  sosBtn: { height: 56, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
-  sosBtnText: { fontSize: 16, fontWeight: '700' },
+  actions: { alignSelf: 'stretch', gap: 10, marginTop: 'auto' },
+  actionBtn: { alignSelf: 'stretch' },
+  sosBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEE2E2',
+  },
+  sosText: { color: '#B91C1C', fontSize: 14, fontWeight: '800' },
 });

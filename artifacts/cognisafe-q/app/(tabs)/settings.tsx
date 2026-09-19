@@ -1,25 +1,42 @@
 /**
- * Settings Screen — Organized, grouped settings with premium layout
+ * Settings — Batch 5.
+ *
+ * Grouped rows on top of the main_theme background. Every toggle wires to a
+ * real TripContext setter; no decorative controls that do nothing.
+ *
+ * Groups (matching the reference):
+ *   • Safety        — Alert Countdown, Notify Emergency Services
+ *   • Account       — Profile, Emergency Contacts
+ *   • App           — Notifications, Location Services, About
+ *   • Developer     — Demo Mode, Mock AI (only when devMode already exposed)
  */
 
-import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import {
-  Image,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppBackground } from '@/components/AppBackground';
 import { useTrip } from '@/components/TripContext';
-import { useColors } from '@/hooks/useColors';
-import { GlassCard } from '@/components/AppPrimitives';
+
+const NAVY = '#0F1E4A';
+const NAVY_SOFT = '#334155';
+const MUTED = '#64748B';
+const SURFACE = '#FFFFFF';
+const CARD_BORDER = '#E2ECF7';
+const SAFE = '#22C55E';
+const WARN = '#F59E0B';
+const BRAND_BLUE = '#2563EB';
 
 export default function SettingsScreen() {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
     settings,
@@ -29,212 +46,189 @@ export default function SettingsScreen() {
     setMockAi,
     permissionGranted,
     refreshPermission,
-    tripActive,
-    simulateStatus,
   } = useTrip();
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: 'transparent' }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 110 }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={[styles.screenTitle, { color: colors.text1 }]}>Settings</Text>
-      <Text style={[styles.screenSub, { color: colors.text3 }]}>Configure your safety preferences</Text>
-
-      {/* ── Safety Settings ── */}
-      <SettingGroup title="Safety" icon="shield" iconBg="#F0FBF5" iconColor={colors.safe} colors={colors}>
-        <SettingRow
-          icon="phone-call"
-          iconBg="#F0FBF5"
-          iconColor={colors.safe}
-          title="Notify Emergency Services"
-          body="Include emergency services in the alert."
-          value={settings.notifyEmergencyServices}
-          onValueChange={setNotifyEmergencyServices}
-          colors={colors}
-        />
-        <SettingDivider colors={colors} />
-        {/* Countdown */}
-        <View style={styles.settingRow}>
-          <View style={[styles.settingIcon, { backgroundColor: colors.brandBlueSubtle }]}>
-            <Feather name="clock" size={17} color={colors.brandBlue} />
-          </View>
-          <View style={styles.settingCopy}>
-            <Text style={[styles.settingTitle, { color: colors.text1 }]}>Alert Countdown</Text>
-            <Text style={[styles.settingBody, { color: colors.text3 }]}>Seconds to confirm before escalation</Text>
-          </View>
-          <View style={styles.countdownPills}>
-            {[15, 30, 45].map((s) => (
-              <Pressable
-                key={s}
-                onPress={() => void setCountdownSeconds(s)}
-                style={[
-                  styles.pill,
-                  {
-                    backgroundColor: settings.countdownSeconds === s ? colors.brandBlue : colors.muted,
-                    borderColor: settings.countdownSeconds === s ? colors.brandBlue : colors.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.pillText, { color: settings.countdownSeconds === s ? '#FFFFFF' : colors.text3 }]}>
-                  {s}s
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+    <AppBackground fadeStrength="default">
+      <StatusBar barStyle="dark-content" />
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 120 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.pageHeader}>
+          <Text style={styles.eyebrow}>PREFERENCES</Text>
+          <Text style={styles.pageTitle}>Settings</Text>
         </View>
-      </SettingGroup>
 
-      {/* ── Demo / Developer ── */}
-      <SettingGroup title="Demo & Developer" icon="cpu" iconBg={colors.brandBlueSubtle} iconColor={colors.brandBlue} colors={colors}>
-        <SettingRow
-          icon="play-circle"
-          iconBg={colors.brandBlueSubtle}
-          iconColor={colors.brandBlue}
-          title="Demo Mode"
-          body="Show simulation controls for presentations."
-          value={settings.demoMode}
-          onValueChange={setDemoMode}
-          colors={colors}
-        />
-        <SettingDivider colors={colors} />
-        <SettingRow
-          icon="cpu"
-          iconBg={colors.brandBlueSubtle}
-          iconColor={colors.brandBlue}
-          title="Mock AI"
-          body="Use simulated inference instead of AWS."
-          value={settings.mockAi}
-          onValueChange={setMockAi}
-          colors={colors}
-        />
-        {settings.demoMode && (
-          <View style={[styles.demoSection, { borderTopColor: colors.border }]}>
-            <Text style={[styles.demoLabel, { color: colors.text3 }]}>
-              SIMULATE STATUS {!tripActive ? '— start a trip first' : ''}
-            </Text>
-            <View style={styles.demoButtons}>
-              {(['SAFE', 'ALERT', 'EMERGENCY'] as const).map((st) => {
-                const sc = st === 'SAFE' ? colors.safe : st === 'ALERT' ? colors.warning : colors.destructive;
+        {/* ── Safety ── */}
+        <SectionLabel>Safety</SectionLabel>
+        <Group>
+          <RowToggle
+            icon="phone-call"
+            iconBg="#DCFCE7"
+            iconColor={SAFE}
+            title="Notify Emergency Services"
+            body="Include emergency services in the alert."
+            value={settings.notifyEmergencyServices}
+            onChange={setNotifyEmergencyServices}
+          />
+          <Divider />
+          <View style={styles.row}>
+            <View style={[styles.rowIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Feather name="clock" size={16} color={BRAND_BLUE} />
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>Alert Countdown</Text>
+              <Text style={styles.rowBody}>Seconds to confirm before escalation.</Text>
+            </View>
+            <View style={styles.pillRow}>
+              {[15, 30, 45].map((s) => {
+                const active = settings.countdownSeconds === s;
                 return (
                   <Pressable
-                    key={st}
-                    disabled={!tripActive}
-                    onPress={() => void simulateStatus(st)}
+                    key={s}
+                    onPress={() => void setCountdownSeconds(s)}
                     style={[
-                      styles.demoBtn,
-                      { backgroundColor: sc + '18', borderColor: sc + '44' },
-                      !tripActive && styles.disabled,
+                      styles.pill,
+                      active ? styles.pillActive : styles.pillIdle,
                     ]}
                   >
-                    <View style={[styles.demoDot, { backgroundColor: sc }]} />
-                    <Text style={[styles.demoBtnText, { color: sc }]}>{st}</Text>
+                    <Text style={active ? styles.pillTextActive : styles.pillTextIdle}>
+                      {s}s
+                    </Text>
                   </Pressable>
                 );
               })}
             </View>
           </View>
-        )}
-      </SettingGroup>
+        </Group>
 
-      {/* ── Connection ── */}
-      <SettingGroup title="Connection" icon="wifi" iconBg="#F5F0FF" iconColor="#7C3AED" colors={colors}>
-        <View style={styles.settingRow}>
-          <View style={[styles.settingIcon, { backgroundColor: '#F5F0FF' }]}>
-            <Feather name="link" size={17} color="#7C3AED" />
-          </View>
-          <View style={styles.settingCopy}>
-            <Text style={[styles.settingTitle, { color: colors.text1 }]}>API Endpoint</Text>
-            <Text style={[styles.settingBody, { color: colors.text3 }]}>Configured via environment variables</Text>
-          </View>
-          <View style={[styles.badge, { backgroundColor: settings.mockAi ? colors.muted : '#F0FBF5', borderColor: settings.mockAi ? colors.border : colors.safeBorder }]}>
-            <Text style={[styles.badgeText, { color: settings.mockAi ? colors.text3 : colors.safe }]}>
-              {settings.mockAi ? 'MOCK' : 'LIVE'}
-            </Text>
-          </View>
-        </View>
-      </SettingGroup>
+        {/* ── Account ── */}
+        <SectionLabel>Account</SectionLabel>
+        <Group>
+          <RowLink
+            icon="user"
+            iconBg="#DBEAFE"
+            iconColor={BRAND_BLUE}
+            title="Profile"
+            body="Your name, contact and account details."
+            onPress={() => router.push('/profile' as never)}
+          />
+          <Divider />
+          <RowLink
+            icon="users"
+            iconBg="#DCFCE7"
+            iconColor={SAFE}
+            title="Emergency Contacts"
+            body="Manage the circle notified during an alert."
+            onPress={() => router.push('/(tabs)/contacts')}
+          />
+        </Group>
 
-      {/* ── Device Access ── */}
-      <SettingGroup title="Device Access" icon="smartphone" iconBg="#F0F5FF" iconColor="#2563EB" colors={colors}>
-        <View style={styles.settingRow}>
-          <View style={[styles.settingIcon, { backgroundColor: '#F0F5FF' }]}>
-            <Feather name="map-pin" size={17} color="#2563EB" />
+        {/* ── App ── */}
+        <SectionLabel>App</SectionLabel>
+        <Group>
+          <RowLink
+            icon="bell"
+            iconBg="#FEF3C7"
+            iconColor={WARN}
+            title="Notifications"
+            body="Alerts, weekly reports and system events."
+            onPress={() => router.push('/notifications' as never)}
+          />
+          <Divider />
+          {/* Location Services — real state row with Refresh action */}
+          <View style={styles.row}>
+            <View style={[styles.rowIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Feather name="map-pin" size={16} color={BRAND_BLUE} />
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>Location Services</Text>
+              <Text style={styles.rowBody}>
+                {permissionGranted === true
+                  ? 'Ready for trip monitoring.'
+                  : permissionGranted === false
+                  ? 'Access denied — enable in system Settings.'
+                  : 'Checking…'}
+              </Text>
+            </View>
+            <View style={styles.rowRight}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: permissionGranted ? SAFE : WARN },
+                ]}
+              />
+              <Pressable onPress={() => void refreshPermission()} hitSlop={6}>
+                <Text style={styles.refresh}>Refresh</Text>
+              </Pressable>
+            </View>
           </View>
-          <View style={styles.settingCopy}>
-            <Text style={[styles.settingTitle, { color: colors.text1 }]}>Location Access</Text>
-            <Text style={[styles.settingBody, { color: colors.text3 }]}>
-              {permissionGranted ? 'Ready for trip monitoring' : 'Required for GPS tracking'}
-            </Text>
-          </View>
-          <View style={styles.accessRight}>
-            <View style={[styles.accessDot, { backgroundColor: permissionGranted ? colors.safe : colors.warning }]} />
-            <Pressable onPress={() => void refreshPermission()}>
-              <Text style={[styles.refreshText, { color: colors.brandBlue }]}>Refresh</Text>
-            </Pressable>
-          </View>
-        </View>
-        <SettingDivider colors={colors} />
-        <View style={styles.settingRow}>
-          <View style={[styles.settingIcon, { backgroundColor: '#F0F5FF' }]}>
-            <Feather name="activity" size={17} color="#2563EB" />
-          </View>
-          <View style={styles.settingCopy}>
-            <Text style={[styles.settingTitle, { color: colors.text1 }]}>Motion Sensors</Text>
-            <Text style={[styles.settingBody, { color: colors.text3 }]}>Accelerometer + gyroscope active</Text>
-          </View>
-          <Feather name="check-circle" size={20} color={colors.safe} />
-        </View>
-      </SettingGroup>
+          <Divider />
+          <RowLink
+            icon="info"
+            iconBg="#E2ECF7"
+            iconColor={NAVY_SOFT}
+            title="About"
+            body="Version, licenses and product info."
+            onPress={() => router.push('/about' as never)}
+          />
+        </Group>
 
-      {/* ── About ── */}
-      <GlassCard style={styles.aboutCard}>
-        <Image
-          source={require('@/assets/images/cognisafe-icon.png')}
-          style={styles.aboutLogo}
-          resizeMode="contain"
-        />
-        <Text style={[styles.aboutName, { color: colors.text1 }]}>Cognisafe-Q</Text>
-        <Text style={[styles.aboutTagline, { color: colors.text3 }]}>
-          Safety intelligence for every journey.
-        </Text>
-        <View style={[styles.aboutDivider, { backgroundColor: colors.border }]} />
-        <Text style={[styles.aboutVersion, { color: colors.text4 }]}>Hackathon MVP · v1.0 · React Native + Expo</Text>
-      </GlassCard>
-    </ScrollView>
+        {/* ── Developer ── */}
+        <SectionLabel>Developer</SectionLabel>
+        <Group>
+          <RowToggle
+            icon="play-circle"
+            iconBg="#EDE9FE"
+            iconColor="#7C3AED"
+            title="Demo Mode"
+            body="Show simulation controls for presentations."
+            value={settings.demoMode}
+            onChange={setDemoMode}
+          />
+          <Divider />
+          <RowToggle
+            icon="cpu"
+            iconBg="#EDE9FE"
+            iconColor="#7C3AED"
+            title="Mock AI"
+            body="Use simulated inference instead of the API."
+            value={settings.mockAi}
+            onChange={setMockAi}
+          />
+        </Group>
+      </ScrollView>
+    </AppBackground>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Building blocks ─────────────────────────────────────────────────────
 
-function SettingGroup({
-  title, icon, iconBg, iconColor, children, colors,
-}: {
-  title: string;
-  icon: React.ComponentProps<typeof Feather>['name'];
-  iconBg: string;
-  iconColor: string;
-  children: React.ReactNode;
-  colors: ReturnType<typeof useColors>;
-}) {
-  return (
-    <View style={styles.group}>
-      <View style={styles.groupHeader}>
-        <View style={[styles.groupIcon, { backgroundColor: iconBg }]}>
-          <Feather name={icon} size={14} color={iconColor} />
-        </View>
-        <Text style={[styles.groupTitle, { color: colors.text2 }]}>{title}</Text>
-      </View>
-      <GlassCard style={styles.groupCard} noPadding>
-        {children}
-      </GlassCard>
-    </View>
-  );
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <Text style={styles.sectionLabel}>{String(children).toUpperCase()}</Text>;
 }
 
-function SettingRow({
-  icon, iconBg, iconColor, title, body, value, onValueChange, colors,
+function Group({ children }: { children: React.ReactNode }) {
+  return <View style={styles.group}>{children}</View>;
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
+}
+
+function RowToggle({
+  icon,
+  iconBg,
+  iconColor,
+  title,
+  body,
+  value,
+  onChange,
 }: {
   icon: React.ComponentProps<typeof Feather>['name'];
   iconBg: string;
@@ -242,82 +236,106 @@ function SettingRow({
   title: string;
   body: string;
   value: boolean;
-  onValueChange: (v: boolean) => void;
-  colors: ReturnType<typeof useColors>;
+  onChange: (v: boolean) => void;
 }) {
   return (
-    <View style={styles.settingRow}>
-      <View style={[styles.settingIcon, { backgroundColor: iconBg }]}>
-        <Feather name={icon} size={17} color={iconColor} />
+    <View style={styles.row}>
+      <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
+        <Feather name={icon} size={16} color={iconColor} />
       </View>
-      <View style={styles.settingCopy}>
-        <Text style={[styles.settingTitle, { color: colors.text1 }]}>{title}</Text>
-        <Text style={[styles.settingBody, { color: colors.text3 }]}>{body}</Text>
+      <View style={styles.rowCopy}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowBody}>{body}</Text>
       </View>
       <Switch
         value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.muted, true: colors.brandBlue }}
+        onValueChange={onChange}
+        trackColor={{ false: '#E2ECF7', true: BRAND_BLUE }}
         thumbColor="#FFFFFF"
-        ios_backgroundColor={colors.muted}
       />
     </View>
   );
 }
 
-function SettingDivider({ colors }: { colors: ReturnType<typeof useColors> }) {
-  return <View style={[styles.divider, { backgroundColor: colors.border, marginLeft: 65 }]} />;
+function RowLink({
+  icon,
+  iconBg,
+  iconColor,
+  title,
+  body,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  body: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.row}>
+      <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
+        <Feather name={icon} size={16} color={iconColor} />
+      </View>
+      <View style={styles.rowCopy}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowBody}>{body}</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color={MUTED} />
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { paddingHorizontal: 20, gap: 10 },
-  screenTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginBottom: 2 },
-  screenSub: { fontSize: 13, marginBottom: 10 },
+  scroll: { paddingHorizontal: 20, gap: 12 },
 
-  // Groups
-  group: { gap: 8 },
-  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 4 },
-  groupIcon: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  groupTitle: { fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
-  groupCard: { overflow: 'hidden' },
+  pageHeader: { gap: 2 },
+  eyebrow: { color: MUTED, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
+  pageTitle: { color: NAVY, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
 
-  // Rows
-  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 15 },
-  settingIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  settingCopy: { flex: 1 },
-  settingTitle: { fontSize: 14, fontWeight: '700', marginBottom: 3 },
-  settingBody: { fontSize: 12, lineHeight: 17 },
-  divider: { height: 1 },
+  sectionLabel: {
+    color: NAVY_SOFT,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginTop: 8,
+    marginLeft: 4,
+  },
 
-  // Countdown pills
-  countdownPills: { flexDirection: 'row', gap: 5 },
-  pill: { borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 9, paddingVertical: 6 },
-  pillText: { fontSize: 11, fontWeight: '700' },
+  group: {
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  divider: { height: 1, backgroundColor: CARD_BORDER, marginHorizontal: 14 },
 
-  // Demo
-  demoSection: { borderTopWidth: 1, padding: 15, gap: 10 },
-  demoLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  demoButtons: { flexDirection: 'row', gap: 8 },
-  demoBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 12, paddingVertical: 11 },
-  demoDot: { width: 7, height: 7, borderRadius: 3.5 },
-  demoBtnText: { fontSize: 11, fontWeight: '800' },
-  disabled: { opacity: 0.4 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  rowIcon: {
+    width: 34, height: 34, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  rowCopy: { flex: 1, gap: 2 },
+  rowTitle: { color: NAVY, fontSize: 14, fontWeight: '800' },
+  rowBody: { color: NAVY_SOFT, fontSize: 12 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  refresh: { color: BRAND_BLUE, fontSize: 12, fontWeight: '800' },
 
-  // Badge
-  badge: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5 },
-  badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.7 },
-
-  // Access
-  accessRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  accessDot: { width: 8, height: 8, borderRadius: 4 },
-  refreshText: { fontSize: 12, fontWeight: '700' },
-
-  // About
-  aboutCard: { padding: 24, alignItems: 'center', gap: 6, marginTop: 10 },
-  aboutLogo: { width: 72, height: 72, marginBottom: 6 },
-  aboutName: { fontSize: 18, fontWeight: '800' },
-  aboutTagline: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
-  aboutDivider: { height: 1, width: '100%', marginVertical: 8 },
-  aboutVersion: { fontSize: 11 },
+  pillRow: { flexDirection: 'row', gap: 6 },
+  pill: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
+    borderWidth: 1,
+  },
+  pillActive: { backgroundColor: BRAND_BLUE, borderColor: BRAND_BLUE },
+  pillIdle: { backgroundColor: '#F1F5F9', borderColor: CARD_BORDER },
+  pillTextActive: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  pillTextIdle: { color: NAVY_SOFT, fontSize: 11, fontWeight: '800' },
 });

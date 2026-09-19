@@ -1,209 +1,333 @@
 /**
- * Emergency Screen — Full red emergency response screen
- * Activated after countdown expires or manual SOS triggered.
+ * Emergency Active + Help Sent — one screen, two visual modes.
+ *
+ * MODE 1 ("Emergency Active")
+ *   Shown while the emergency alert is being dispatched. Uses the emergency
+ *   mascot, red brand pill, red rings, and the "Response initiated" copy.
+ *   Checklist reflects the three real states we can measure:
+ *     • Location acquired          — we know coords were captured
+ *     • Notifying emergency contacts — dispatch is in flight
+ *     • Recording event             — trip log/emergency event persisted
+ *
+ * MODE 2 ("Help Sent")
+ *   Once `emergencySent` flips true the whole screen shifts to a reassuring
+ *   blue + green theme with the heart mascot: "Help is on the way!" with
+ *   completed checklist items (contacts notified · location shared · event
+ *   recorded).
+ *
+ * Actions "Call Emergency Services" and "Share Live Location" are preserved
+ * and always available.
  */
 
-import { Feather } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PrimaryButton } from '@/components/AppPrimitives';
-import { useTrip } from '@/components/TripContext';
-import { useColors } from '@/hooks/useColors';
+import {
+  Animated,
+  Easing,
+  Linking,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppBackground } from '@/components/AppBackground';
+import { Mascot } from '@/components/Mascot';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { useTrip } from '@/components/TripContext';
+
+// Palette (local — no theme file touched)
+const NAVY = '#0F1E4A';
+const NAVY_SOFT = '#334155';
+const MUTED = '#64748B';
+const DANGER = '#DC2626';
+const DANGER_BG = '#FEE2E2';
+const DANGER_BORDER = '#FCA5A5';
+const SAFE = '#16A34A';
+const SAFE_BG = '#DCFCE7';
+const SAFE_BORDER = '#86EFAC';
+const BRAND_BLUE = '#2563EB';
+const BRAND_BLUE_BG = '#DBEAFE';
+const CARD_BORDER = '#E2ECF7';
+
+// Local number formatter for the elapsed timer
+const fmt = (s: number) =>
+  `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 export default function EmergencyScreen() {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { contacts, canCancelEmergency, cancelEmergency, stopTrip } = useTrip();
+  const {
+    contacts,
+    canCancelEmergency,
+    cancelEmergency,
+    stopTrip,
+    emergencySent,
+    permissionGranted,
+  } = useTrip();
   const primary = contacts[0];
-
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const ringAnim = useRef(new Animated.Value(0.8)).current;
-  const elapsedRef = useRef(0);
   const [elapsed, setElapsed] = useState(0);
 
+  const pulse = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
+    void Haptics.notificationAsync(
+      emergencySent
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Error
+    );
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.1, duration: 500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.1, duration: emergencySent ? 900 : 500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+        Animated.timing(pulse, { toValue: 1, duration: emergencySent ? 900 : 500, useNativeDriver: true }),
       ])
     ).start();
+    const t = setInterval(() => setElapsed((n) => n + 1), 1000);
+    return () => { pulse.stopAnimation(); clearInterval(t); };
+  }, [pulse, emergencySent]);
 
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(ringAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(ringAnim, { toValue: 0.8, duration: 800, useNativeDriver: true }),
-      ])
-    ).start();
+  // ── Themeable derived values ─────────────────────────────────────────
+  const isHelpSent = emergencySent;
+  const accent = isHelpSent ? BRAND_BLUE : DANGER;
+  const accentBg = isHelpSent ? BRAND_BLUE_BG : DANGER_BG;
+  const accentBorder = isHelpSent ? SAFE_BORDER : DANGER_BORDER;
 
-    const timer = setInterval(() => {
-      elapsedRef.current += 1;
-      setElapsed(elapsedRef.current);
-    }, 1000);
+  const brandLine = isHelpSent ? 'HELP SENT' : 'EMERGENCY ACTIVE';
+  const title = isHelpSent ? 'Help is on the way!' : 'Emergency';
+  const sub = isHelpSent ? 'Your emergency contacts have been notified.' : 'Response initiated.';
 
-    return () => {
-      pulseAnim.stopAnimation();
-      ringAnim.stopAnimation();
-      clearInterval(timer);
-    };
-  }, [pulseAnim, ringAnim]);
-
-  const formatElapsed = (s: number) =>
-    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  // Location step is complete once we have permission (fed from TripContext);
+  // Notify + Record complete once dispatch has finished (`emergencySent`).
+  const locationDone = permissionGranted === true;
+  const notifyDone = emergencySent;
+  const recordDone = emergencySent;
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: '#FFF0F0', paddingTop: insets.top + 20, paddingBottom: insets.bottom + 28 },
-      ]}
-    >
-      {/* ── Top indicator ── */}
-      <View style={styles.topLabel}>
-        <Text style={[styles.topEyebrow, { color: colors.destructive }]}>COGNISAFE-Q</Text>
-        <Text style={[styles.topSub, { color: colors.text3 }]}>EMERGENCY RESPONSE ACTIVE</Text>
-      </View>
-
-      {/* ── Central emergency indicator ── */}
-      <View style={styles.centerSection}>
-        <View style={styles.ringWrap}>
-          <Animated.View style={[styles.outerRing, { borderColor: colors.destructive, opacity: ringAnim }]} />
-          <Animated.View style={[styles.innerRing, { borderColor: colors.destructive, transform: [{ scale: pulseAnim }] }]} />
-          <View style={[styles.emergencyCore, { backgroundColor: colors.destructive }]}>
-            <Feather name="alert-octagon" size={38} color="#FFFFFF" />
+    <AppBackground fadeStrength="default">
+      <StatusBar barStyle="dark-content" />
+      <View
+        style={[
+          styles.container,
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+        ]}
+      >
+        {/* Header eyebrow */}
+        <View style={styles.header}>
+          <Text style={styles.brandLine}>COGNISAFE-Q</Text>
+          <View style={[styles.pill, { backgroundColor: accentBg, borderColor: accentBorder }]}>
+            <Animated.View style={[styles.pillDot, { backgroundColor: accent, transform: [{ scale: pulse }] }]} />
+            <Text style={[styles.pillText, { color: accent }]}>{brandLine}</Text>
           </View>
         </View>
-        <Text style={[styles.emergencyLabel, { color: colors.destructive }]}>EMERGENCY</Text>
-        <Text style={[styles.emergencySub, { color: colors.text2 }]}>Response initiated</Text>
-        <View style={[styles.elapsedBadge, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '44' }]}>
-          <Feather name="clock" size={13} color={colors.destructive} />
-          <Text style={[styles.elapsedText, { color: colors.destructive }]}>{formatElapsed(elapsed)}</Text>
+
+        {/* Mascot inside ring */}
+        <View style={styles.ringWrap}>
+          <Animated.View
+            style={[
+              styles.ringOuter,
+              { borderColor: accentBorder, transform: [{ scale: pulse }] },
+            ]}
+          />
+          <View style={[styles.ringInner, { backgroundColor: accent + '18' }]} />
+          <Mascot size={168} pose={isHelpSent ? 'heart' : 'emergency'} />
+        </View>
+
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.sub}>{sub}</Text>
+
+        <View style={[styles.elapsedChip, { borderColor: accentBorder }]}>
+          <Feather name="clock" size={13} color={accent} />
+          <Text style={[styles.elapsedText, { color: accent }]}>{fmt(elapsed)}</Text>
+        </View>
+
+        {/* Real-status checklist */}
+        <View style={styles.statusCard}>
+          <ChecklistItem
+            icon="map-pin"
+            text={locationDone ? 'Location permission granted' : 'Location permission required'}
+            done={locationDone}
+          />
+          <Divider />
+          <ChecklistItem
+            icon="send"
+            text={
+              notifyDone
+                ? primary
+                  ? `${primary.name} notified`
+                  : `${contacts.length || 0} contacts notified`
+                : 'Notifying emergency contacts…'
+            }
+            done={notifyDone}
+          />
+          <Divider />
+          <ChecklistItem
+            icon="edit-3"
+            text={recordDone ? 'Emergency event recorded' : 'Recording event…'}
+            done={recordDone}
+          />
+        </View>
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <PrimaryButton
+            label={primary ? `Call ${primary.name}` : 'Call Emergency Services'}
+            onPress={() => {
+              const number = primary?.phone ?? '112';
+              void Linking.openURL(`tel:${number}`);
+            }}
+            style={styles.actionBtn}
+          />
+          <Pressable
+            onPress={() => router.push('/live-location' as never)}
+            style={styles.secondaryBtn}
+          >
+            <Feather name="navigation" size={16} color={NAVY} />
+            <Text style={styles.secondaryText}>Share Live Location</Text>
+          </Pressable>
+
+          {canCancelEmergency && (
+            <Pressable
+              onPress={() => { cancelEmergency(); router.replace('/trip'); }}
+              style={styles.cancelBtn}
+            >
+              <Text style={styles.cancelText}>Cancel — False Alarm</Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            onPress={async () => { await stopTrip(); router.replace('/summary'); }}
+            style={styles.endBtn}
+          >
+            <Text style={styles.endText}>End Trip</Text>
+          </Pressable>
         </View>
       </View>
+    </AppBackground>
+  );
+}
 
-      {/* ── Status card ── */}
-      <View style={[styles.statusCard, { backgroundColor: colors.card, borderColor: '#FFCCCC' }]}>
-        <StatusLine icon="map-pin" label="Location" text="GPS location captured" active colors={colors} />
-        <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
-        <StatusLine icon="send" label="Alert" text="Emergency alert sent" active colors={colors} />
-        <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
-        <StatusLine
-          icon="users"
-          label="Contacts"
-          text={primary ? `${primary.name} notified` : `${contacts.length || 0} contacts notified`}
-          active={contacts.length > 0}
-          colors={colors}
-        />
+function ChecklistItem({
+  icon,
+  text,
+  done,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  text: string;
+  done: boolean;
+}) {
+  return (
+    <View style={styles.checkRow}>
+      <View style={[styles.checkTile, { backgroundColor: done ? SAFE_BG : '#F1F5F9' }]}>
+        <Feather name={icon} size={14} color={done ? SAFE : MUTED} />
       </View>
-
-      {/* ── Info message ── */}
-      <View style={[styles.infoBox, { backgroundColor: '#FFF8F8', borderColor: '#FFCCCC' }]}>
-        <Feather name="info" size={14} color={colors.destructive} />
-        <Text style={[styles.infoText, { color: colors.text2 }]}>
-          Your emergency contacts have been notified with your GPS location.
-        </Text>
-      </View>
-
-      {/* ── Actions ── */}
-      <View style={styles.actions}>
-        {primary ? (
-          <PrimaryButton
-            icon="phone"
-            variant="danger"
-            onPress={() => void Linking.openURL(`tel:${primary.phone}`)}
-          >
-            Call {primary.name}
-          </PrimaryButton>
-        ) : null}
-
-        <PrimaryButton
-          icon="navigation"
-          variant="secondary"
-          onPress={() =>
-            Alert.alert('Location Shared', 'Your GPS coordinates were included in the emergency notification.')
-          }
-        >
-          View Location Details
-        </PrimaryButton>
-
-        {canCancelEmergency && (
-          <Pressable
-            onPress={() => { cancelEmergency(); router.replace('/trip'); }}
-            style={[styles.cancelBtn, { borderColor: colors.border }]}
-          >
-            <Text style={[styles.cancelText, { color: colors.text3 }]}>Cancel — False Alarm</Text>
-          </Pressable>
-        )}
-
-        <Pressable
-          onPress={async () => { await stopTrip(); router.replace('/summary'); }}
-          style={styles.endTripBtn}
-        >
-          <Text style={[styles.endTripText, { color: colors.text4 }]}>End Trip</Text>
-        </Pressable>
-      </View>
+      <Text style={styles.checkText}>{text}</Text>
+      <Feather
+        name={done ? 'check-circle' : 'circle'}
+        size={18}
+        color={done ? SAFE : MUTED}
+      />
     </View>
   );
 }
 
-function StatusLine({
-  icon, label, text, active, colors,
-}: {
-  icon: React.ComponentProps<typeof Feather>['name'];
-  label: string;
-  text: string;
-  active: boolean;
-  colors: ReturnType<typeof useColors>;
-}) {
-  return (
-    <View style={styles.statusLine}>
-      <View style={[styles.statusIconWrap, { backgroundColor: active ? '#F0FBF5' : '#F5F5F5' }]}>
-        <Feather name={icon} size={15} color={active ? colors.safe : colors.text4} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.statusLineLabel, { color: colors.text3 }]}>{label.toUpperCase()}</Text>
-        <Text style={[styles.statusLineText, { color: colors.text1 }]}>{text}</Text>
-      </View>
-      <Feather name="check-circle" size={18} color={active ? colors.safe : colors.text4} />
-    </View>
-  );
+function Divider() {
+  return <View style={styles.divider} />;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 24 },
-  topLabel: { alignItems: 'center', marginBottom: 20 },
-  topEyebrow: { fontSize: 14, fontWeight: '800', letterSpacing: 2 },
-  topSub: { fontSize: 10, fontWeight: '600', letterSpacing: 1.5, marginTop: 2 },
+  container: { flex: 1, paddingHorizontal: 20, alignItems: 'center', gap: 10 },
 
-  centerSection: { alignItems: 'center', marginBottom: 24 },
-  ringWrap: { width: 200, height: 200, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  outerRing: { position: 'absolute', width: 200, height: 200, borderRadius: 100, borderWidth: 1.5 },
-  innerRing: { position: 'absolute', width: 152, height: 152, borderRadius: 76, borderWidth: 2 },
-  emergencyCore: { width: 110, height: 110, borderRadius: 55, alignItems: 'center', justifyContent: 'center', shadowColor: '#E53935', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 12 },
-  emergencyLabel: { fontSize: 26, fontWeight: '900', letterSpacing: 4 },
-  emergencySub: { fontSize: 15, marginTop: 4 },
-  elapsedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, marginTop: 12 },
-  elapsedText: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  header: { alignItems: 'center', gap: 6 },
+  brandLine: { color: MUTED, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  pillDot: { width: 7, height: 7, borderRadius: 3.5 },
+  pillText: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
 
-  statusCard: { borderRadius: 20, borderWidth: 1.5, overflow: 'hidden', marginBottom: 14 },
-  statusLine: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  statusIconWrap: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  statusLineLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
-  statusLineText: { fontSize: 14, fontWeight: '600', marginTop: 1 },
-  statusDivider: { height: 1 },
+  ringWrap: { width: 210, height: 210, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  ringOuter: {
+    position: 'absolute',
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    borderWidth: 1.5,
+  },
+  ringInner: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+  },
 
-  infoBox: { borderRadius: 14, borderWidth: 1.5, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 20 },
-  infoText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  title: { color: NAVY, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, textAlign: 'center' },
+  sub: { color: NAVY_SOFT, fontSize: 14, textAlign: 'center' },
 
-  actions: { gap: 11 },
-  cancelBtn: { height: 52, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontSize: 14, fontWeight: '600' },
-  endTripBtn: { alignItems: 'center', paddingVertical: 8 },
-  endTripText: { fontSize: 13, fontWeight: '500' },
+  elapsedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    marginTop: 2,
+  },
+  elapsedText: { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
+
+  statusCard: {
+    alignSelf: 'stretch',
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
+  checkTile: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkText: { flex: 1, color: NAVY, fontSize: 13, fontWeight: '600' },
+  divider: { height: 1, backgroundColor: CARD_BORDER, marginHorizontal: 12 },
+
+  actions: { alignSelf: 'stretch', gap: 10, marginTop: 'auto' },
+  actionBtn: { alignSelf: 'stretch' },
+  secondaryBtn: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryText: { color: NAVY, fontSize: 14, fontWeight: '700' },
+  cancelBtn: {
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: { color: NAVY_SOFT, fontSize: 13, fontWeight: '700' },
+  endBtn: { alignItems: 'center', paddingVertical: 8 },
+  endText: { color: MUTED, fontSize: 13, fontWeight: '600' },
 });

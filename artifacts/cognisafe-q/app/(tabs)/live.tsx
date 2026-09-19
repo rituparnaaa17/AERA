@@ -8,7 +8,8 @@ import React, { useEffect, useRef } from 'react';
 import { Alert, Animated, Easing, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton, SectionHeader, StatusPill, GlassCard } from '@/components/AppPrimitives';
-import { SensorStatusCard } from '@/components/SensorStatusCard';
+import { Mascot } from '@/components/Mascot';
+import { SensorGrid } from '@/components/SensorTiles';
 import { SOSButton } from '@/components/SOSButton';
 import { useTrip } from '@/components/TripContext';
 import { useColors } from '@/hooks/useColors';
@@ -69,8 +70,8 @@ export default function LiveTabScreen() {
         /* ── No trip state ── */
         <View>
           <GlassCard style={styles.startCard}>
-            <View style={[styles.startIconWrap, { backgroundColor: colors.brandBlueSubtle }]}>
-              <Feather name="shield" size={32} color={colors.brandBlue} />
+            <View style={styles.startMascotWrap}>
+              <Mascot size={120} pose="sos" />
             </View>
             <Text style={[styles.startTitle, { color: colors.text1 }]}>Nothing being monitored</Text>
             <Text style={[styles.startBody, { color: colors.text3 }]}>
@@ -159,7 +160,7 @@ export default function LiveTabScreen() {
           {/* Sensor health */}
           <View style={styles.section}>
             <SectionHeader title="Sensor Health" />
-            <SensorStatusCard
+            <SensorGrid
               locationReady={permissionGranted === true}
               isMockAi={settings.mockAi}
               isOffline={!networkAvailable}
@@ -193,7 +194,8 @@ const styles = StyleSheet.create({
   screenSub: { fontSize: 13, marginTop: 2 },
 
   // No trip
-  startCard: { padding: 24, gap: 14, marginBottom: 16 },
+  startCard: { padding: 24, gap: 14, marginBottom: 16, alignItems: 'center' },
+  startMascotWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   startIconWrap: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   startTitle: { fontSize: 20, fontWeight: '700' },
   startBody: { fontSize: 14, lineHeight: 21 },
