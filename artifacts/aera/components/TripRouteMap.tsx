@@ -1,166 +1,125 @@
 /**
- * TripRouteMap — real geographic map for trip route + Live Location.
+ * TripRouteMap — OpenStreetMap Leaflet Map Renderer.
  *
- * Uses `react-native-maps` (installed for this build; ships bundled in
- * Expo Go). Renders the recorded route as a polyline over the real
- * basemap (Google Maps on Android, Apple Maps on iOS) and fits the
- * viewport to the route's bounding box.
+ * Uses `react-native-webview` + OpenStreetMap (Leaflet.js) to render
+ * real interactive basemaps on Android, iOS, and Web.
  *
- * States handled:
- *   • 0 samples             → clean "Route unavailable" card.
- *   • 1 sample (stationary) → real map centred on that coordinate with a
- *                             single blue marker.
- *   • 2+ samples            → polyline + green start + blue end markers.
- *
- * On web (react-native-maps has no web renderer) the component falls back
- * to the "unavailable" card so the app still builds and runs on Metro web.
+ * Zero API keys required (no Google Maps API key dependency). Eliminates
+ * black placeholders on physical Android phones.
  */
 
 import React, { useMemo } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { Feather } from '@expo/vector-icons';
-
-let MapView: any = View;
-let Marker: any = View;
-let Polyline: any = View;
-let UrlTile: any = View;
-
-if (Platform.OS !== 'web') {
-  try {
-    const Maps = require('react-native-maps');
-    MapView = Maps.default;
-    Marker = Maps.Marker;
-    Polyline = Maps.Polyline;
-    UrlTile = Maps.UrlTile;
-  } catch (e) {
-    console.warn('react-native-maps failed to load:', e);
-  }
-}
 
 type Sample = { lat: number; lng: number };
 
 const NAVY = '#0F1E4A';
 const MUTED = '#64748B';
-const BRAND = '#2563EB';
-const SAFE = '#22C55E';
 const CARD_BORDER = '#E2ECF7';
 
 export function TripRouteMap({
   samples,
   height = 220,
-  currentIndicator,
   distanceKm,
 }: {
   samples: Sample[];
   height?: number;
-  /** Highlight the last sample as a live position dot. */
   currentIndicator?: boolean;
-  /** Overlay the distance chip in the top-right corner. */
   distanceKm?: number;
 }) {
-  // Hooks BEFORE any conditional return
-  const region = useMemo(() => {
-    if (samples.length === 0) return null;
-    const lats = samples.map((s) => s.lat);
-    const lngs = samples.map((s) => s.lng);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const centerLat = (minLat + maxLat) / 2;
-    const centerLng = (minLng + maxLng) / 2;
-    // Pad the deltas so we don't sit tight on markers.
-    const latDelta = Math.max(0.003, (maxLat - minLat) * 1.6);
-    const lngDelta = Math.max(0.003, (maxLng - minLng) * 1.6);
-    return {
-      latitude: centerLat,
-      longitude: centerLng,
-      latitudeDelta: latDelta,
-      longitudeDelta: lngDelta,
-    };
+  const html = useMemo(() => {
+    if (!samples || samples.length === 0) return '';
+    const coords = JSON.stringify(samples.map((s) => [s.lat, s.lng]));
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #EEF4FE; }
+    .leaflet-control-attribution { display: none !important; }
+    .pulse-dot {
+      width: 20px; height: 20px; background: #2563EB; border: 3px solid #FFFFFF; border-radius: 50%;
+      box-shadow: 0 0 12px rgba(37,99,235,0.7); animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.8); }
+      70% { box-shadow: 0 0 0 14px rgba(37,99,235,0); }
+      100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+    }
+    .start-dot {
+      width: 14px; height: 14px; background: #22C55E; border: 2.5px solid #FFFFFF; border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    const coords = ${coords};
+    if (coords && coords.length > 0) {
+      const last = coords[coords.length - 1];
+      const map = L.map('map', { zoomControl: false, attributionControl: false }).setView(last, 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+      }).addTo(map);
+
+      if (coords.length === 1) {
+        const pulseIcon = L.divIcon({ className: 'pulse-dot', iconSize: [20, 20], iconAnchor: [10, 10] });
+        L.marker(last, { icon: pulseIcon }).addTo(map);
+      } else {
+        const polyline = L.polyline(coords, { color: '#2563EB', weight: 5, opacity: 0.85 }).addTo(map);
+        const startDot = L.divIcon({ className: 'start-dot', iconSize: [14, 14], iconAnchor: [7, 7] });
+        const endDot = L.divIcon({ className: 'pulse-dot', iconSize: [20, 20], iconAnchor: [10, 10] });
+        L.marker(coords[0], { icon: startDot }).addTo(map);
+        L.marker(last, { icon: endDot }).addTo(map);
+        map.fitBounds(polyline.getBounds(), { padding: [25, 25] });
+      }
+    }
+  </script>
+</body>
+</html>
+`;
   }, [samples]);
 
-  // Web fallback — react-native-maps has no web renderer here
-  if (Platform.OS === 'web' || samples.length === 0 || !region) {
+  if (!samples || samples.length === 0) {
     return (
       <View style={[styles.container, { height }]}>
         <View style={styles.emptyWrap}>
           <Feather name="map" size={22} color={MUTED} />
-          <Text style={styles.emptyTitle}>
-            {samples.length === 0
-              ? 'Route unavailable for this trip'
-              : 'Map preview unavailable on web'}
-          </Text>
-          <Text style={styles.emptySub}>
-            {samples.length === 0
-              ? 'No GPS samples were recorded during the drive.'
-              : 'Open on iOS or Android to see the route.'}
-          </Text>
+          <Text style={styles.emptyTitle}>Route unavailable for this trip</Text>
+          <Text style={styles.emptySub}>No GPS samples were recorded during the drive.</Text>
         </View>
       </View>
     );
   }
 
-  const start = samples[0];
-  const end = samples[samples.length - 1];
-  const isSingle = samples.length === 1;
-
   return (
     <View style={[styles.container, { height }]}>
-      <MapView
-        style={StyleSheet.absoluteFill}
-        initialRegion={region}
-        region={region}
-        mapType={Platform.OS === 'android' ? 'none' : 'standard'}
-        showsCompass={false}
-        showsMyLocationButton={false}
-        pitchEnabled={false}
-        rotateEnabled={false}
-        // Suppress the built-in Google/Apple Maps points-of-interest overlay
-        // so the OSM raster tiles read cleanly underneath.
-        toolbarEnabled={false}
-      >
-        {/*
-          OpenStreetMap raster tiles — free, no API key required. On Android
-          mapType="none" prevents the black Google Maps placeholder from showing.
-        */}
-        <UrlTile
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-          tileSize={256}
-          flipY={false}
+      {Platform.OS === 'web' ? (
+        <iframe
+          srcDoc={html}
+          style={{ width: '100%', height: '100%', border: 'none' }}
+          title="OpenStreetMap"
         />
-
-        {!isSingle && (
-          <Polyline
-            coordinates={samples.map((s) => ({ latitude: s.lat, longitude: s.lng }))}
-            strokeWidth={5}
-            strokeColor={BRAND}
-          />
-        )}
-
-        {/* Start marker (green) — omit for single-sample stationary trips */}
-        {!isSingle && (
-          <Marker
-            coordinate={{ latitude: start.lat, longitude: start.lng }}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={[styles.markerRing, { borderColor: SAFE }]}>
-              <View style={[styles.markerCore, { backgroundColor: SAFE }]} />
-            </View>
-          </Marker>
-        )}
-
-        {/* End / current marker (blue). For 1-sample: this IS the only marker. */}
-        <Marker
-          coordinate={{ latitude: end.lat, longitude: end.lng }}
-          anchor={{ x: 0.5, y: 0.5 }}
-        >
-          <View style={[styles.markerRing, { borderColor: BRAND }, currentIndicator && styles.markerLive]}>
-            <View style={[styles.markerCore, { backgroundColor: BRAND }]} />
-          </View>
-        </Marker>
-      </MapView>
+      ) : (
+        <WebView
+          originWhitelist={['*']}
+          source={{ html }}
+          style={{ flex: 1, backgroundColor: '#EEF4FE' }}
+          javaScriptEnabled
+          domStorageEnabled
+          scrollEnabled={false}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {distanceKm != null && (
         <View style={styles.distChip}>
@@ -206,28 +165,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { color: NAVY, fontSize: 14, fontWeight: '800' },
   emptySub: { color: MUTED, fontSize: 12, textAlign: 'center' },
-
-  markerRing: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0F1E4A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  markerCore: { width: 10, height: 10, borderRadius: 5 },
-  markerLive: {
-    shadowColor: BRAND,
-    shadowOpacity: 0.55,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-  },
 });
 
 export default TripRouteMap;
+
