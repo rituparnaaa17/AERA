@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '@/components/AppBackground';
 import { useTrip } from '@/components/TripContext';
 import { getCurrentSession, signOut, type AuthSession } from '@/services/authService';
-import { api } from '@/services/apiService';
+import { api, isApiConfigured } from '@/services/apiService';
 
 const NAVY = '#0F1E4A';
 const NAVY_SOFT = '#334155';
@@ -46,14 +46,23 @@ export default function ProfileScreen() {
       const sess = await getCurrentSession();
       setSession(sess);
 
-      // Try fetching backend profile details
+      // Seed the display name from the cached auth session (populated at
+      // signup / signIn from the ID token's `name` claim). This works even
+      // in fully offline mode.
+      if (sess?.name) setProfileName(sess.name);
+
+      // Only reach for the backend when it's actually configured. Offline
+      // mode is a valid state, not an error — so we skip the fetch quietly
+      // instead of firing it and swallowing the response.
+      if (!isApiConfigured()) return;
+
       try {
         const res = await api.profile.get();
         if (res && res.success && res.data.name) {
           setProfileName(res.data.name);
         }
       } catch {
-        // Offline or backend unavailable
+        // Backend unavailable — the cached name from the session still holds.
       }
     };
     void loadUser();

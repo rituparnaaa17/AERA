@@ -86,6 +86,11 @@ export function SensorGrid({
     ? `${diagnostics.gyroMagnitude.toFixed(2)} r/s`
     : 'Inactive';
 
+  // Only the three actual runtime sensors — Accelerometer / Gyroscope / GPS.
+  // AI ("Mock AI" / "AI Engine") and Cloud tiles were redundant here: the
+  // AI state is surfaced by the "View AI Analysis" screen, and cloud/offline
+  // state is surfaced by the app-level offline banner. Keeping this section
+  // focused on the physical device signals makes it easier to glance at.
   return (
     <View style={styles.grid}>
       <SensorTile
@@ -105,18 +110,6 @@ export function SensorGrid({
         status={gpsStatus}
         visual={<GpsViz active={diagnostics.gpsActive} />}
         caption={gpsCaption}
-      />
-      <SensorTile
-        label={isMockAi ? 'Mock AI' : 'AI Engine'}
-        status="active"
-        visual={<CpuViz />}
-        caption={`${windowsProcessed} windows`}
-      />
-      <SensorTile
-        label="Cloud"
-        status={isOffline ? 'warn' : 'active'}
-        visual={<CloudViz active={!isOffline} />}
-        caption={isOffline ? 'Offline' : 'Sync'}
       />
     </View>
   );
@@ -297,13 +290,15 @@ function CloudViz({ active }: { active: boolean }) {
 const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    // No wrapping — the three remaining tiles must stay on a single row.
     gap: 10,
   },
   tile: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 100,
+    // Three tiles must share the row equally on any device width. `flex: 1`
+    // with an aggressive `flexBasis: 0` (via minWidth: 0) lets them shrink
+    // to fit even on narrow phones without wrapping.
+    flex: 1,
+    minWidth: 0,
     backgroundColor: SURFACE,
     borderWidth: 1,
     borderColor: CARD_BORDER,

@@ -1,19 +1,24 @@
 /**
  * TripRouteMap — real geographic map for trip route + Live Location.
  *
- * Uses `react-native-maps` (installed for this build; ships bundled in
- * Expo Go). Renders the recorded route as a polyline over the real
- * basemap (Google Maps on Android, Apple Maps on iOS) and fits the
- * viewport to the route's bounding box.
+ * Uses `react-native-maps` with an OpenStreetMap `UrlTile` overlay so we
+ * never depend on Google Maps API keys. The map's native basemap is left
+ * on the platform default (Apple Maps on iOS, Google Maps SDK on Android)
+ * but is fully covered by the OSM raster tiles, which is why we don't
+ * need `provider={PROVIDER_GOOGLE}` and don't need `googleMaps.apiKey`
+ * configured in app.json.
  *
  * States handled:
  *   • 0 samples             → clean "Route unavailable" card.
- *   • 1 sample (stationary) → real map centred on that coordinate with a
+ *   • 1 sample (stationary) → real OSM map centred on that coordinate with a
  *                             single blue marker.
- *   • 2+ samples            → polyline + green start + blue end markers.
+ *   • 2+ samples            → polyline + green start + blue end markers,
+ *                             viewport fit to bounds.
  *
  * On web (react-native-maps has no web renderer) the component falls back
  * to the "unavailable" card so the app still builds and runs on Metro web.
+ *
+ * OpenStreetMap tiles are attributed inline per the OSM Tile Usage Policy.
  */
 
 import React, { useMemo } from 'react';
@@ -113,22 +118,25 @@ export function TripRouteMap({
         region={region}
         showsCompass={false}
         showsMyLocationButton={false}
+        showsPointsOfInterest={false}
+        showsBuildings={false}
+        showsIndoors={false}
         pitchEnabled={false}
         rotateEnabled={false}
-        // Suppress the built-in Google/Apple Maps points-of-interest overlay
-        // so the OSM raster tiles read cleanly underneath.
+        // Explicitly avoid forcing `provider={PROVIDER_GOOGLE}` — we rely on
+        // the platform default (Apple Maps / Google Maps SDK) and cover it
+        // completely with OSM raster tiles below.
         toolbarEnabled={false}
       >
         {/*
-          OpenStreetMap raster tiles — free, no API key required. On Android
-          this overrides the blank Google Maps base tiles that were failing
-          to load without a `googleMaps.apiKey` in app.json. On iOS it
-          overlays Apple Maps with the same OSM tiles so both platforms
-          look identical.
+          OpenStreetMap raster tiles — free, no API key required. Painted on
+          top of the platform basemap so users see real OSM roads/streets
+          regardless of whether a Google Maps API key is configured.
         */}
         <UrlTile
           urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           maximumZ={19}
+          zIndex={-1}
           flipY={false}
         />
 
@@ -169,6 +177,11 @@ export function TripRouteMap({
           <Text style={styles.distText}>{distanceKm.toFixed(1)} km</Text>
         </View>
       )}
+
+      {/* OpenStreetMap attribution — required by the OSM Tile Usage Policy. */}
+      <View style={styles.attrib} pointerEvents="none">
+        <Text style={styles.attribText}>© OpenStreetMap contributors</Text>
+      </View>
     </View>
   );
 }
@@ -229,6 +242,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
   },
+
+  // OSM attribution — small chip anchored bottom-right of the map.
+  attrib: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+  },
+  attribText: { color: NAVY, fontSize: 9, fontWeight: '600' },
 });
 
 export default TripRouteMap;

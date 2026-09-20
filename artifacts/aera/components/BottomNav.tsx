@@ -23,9 +23,14 @@ type IconName = React.ComponentProps<typeof Feather>['name'];
 const TABS: { route: string; label: string; icon: IconName; sos?: boolean }[] = [
   { route: 'index', label: 'Home', icon: 'home' },
   { route: 'history', label: 'History', icon: 'clock' },
-  { route: 'live', label: 'SOS', icon: 'settings', sos: true },
+  // SOS: use the classic emergency-warning octagon glyph — instantly reads
+  // as "alert" / "stop", replacing the previous gear icon that looked like
+  // a duplicate of the Settings tab.
+  { route: 'live', label: 'SOS', icon: 'alert-octagon', sos: true },
   { route: 'contacts', label: 'Contacts', icon: 'users' },
-  { route: 'settings', label: 'Settings', icon: 'sliders' },
+  // Settings: use the same clean gear glyph the Dashboard header used
+  // previously (Feather `settings`) instead of the equalizer sliders.
+  { route: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 type TabRoute = { key: string; name: string };

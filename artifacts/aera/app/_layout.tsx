@@ -32,6 +32,14 @@ function RootLayoutNav() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // ── Auth guard ────────────────────────────────────────────────────────────
+  //
+  // On COLD START the app must always land on the Landing screen (`/`). We
+  // never auto-forward to the tabs just because a previous session exists —
+  // the user decides whether to Sign In / Get Started from Landing.
+  //
+  // What we DO enforce: any attempt to reach a protected route without a
+  // session bounces to the Login screen. Landing, onboarding, and the auth
+  // group are always public.
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -40,19 +48,18 @@ function RootLayoutNav() {
         setIsAuthenticated(authenticated);
         setAuthChecked(true);
 
-        const inAuthGroup = segments[0] === '(auth)';
+        const seg0 = segments[0] ?? '';
+        const PUBLIC_ROOTS = new Set(['(auth)', 'onboarding']);
+        // The Landing screen is served at `/` which appears with no segments.
+        const onLanding = !seg0;
+        const isPublic = onLanding || PUBLIC_ROOTS.has(seg0);
 
-        if (!authenticated && !inAuthGroup) {
-          // Not logged in and not in auth screens → send to login
+        if (!authenticated && !isPublic) {
           router.replace('/(auth)/login');
-        } else if (authenticated && inAuthGroup) {
-          // Logged in but still on auth screens → send to main app
-          router.replace('/(tabs)');
         }
       } catch (err) {
         console.error('Auth check error:', err);
         setAuthChecked(true);
-        router.replace('/(auth)/login');
       }
     };
     void checkAuth();
