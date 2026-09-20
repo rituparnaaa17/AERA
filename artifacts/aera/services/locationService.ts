@@ -28,18 +28,24 @@ export async function getEmergencyLocationFix(): Promise<LocationFix | null> {
     const perm = await Location.getForegroundPermissionsAsync();
     if (perm.status !== 'granted') return null;
 
-    const loc = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.BestForNavigation,
+    // Race getCurrentPositionAsync against a 3-second timeout, falling back to getLastKnownPositionAsync
+    const fetchFix = Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
     });
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+
+    const loc = (await Promise.race([fetchFix, timeout])) || (await Location.getLastKnownPositionAsync({}));
+
+    if (!loc) return null;
 
     return {
       lat: loc.coords.latitude,
       lng: loc.coords.longitude,
       accuracy: loc.coords.accuracy ?? undefined,
-      speed: loc.coords.speed !== null && loc.coords.speed >= 0
+      speed: loc.coords.speed !== null && loc.coords.speed !== undefined && loc.coords.speed >= 0
         ? loc.coords.speed
         : undefined,
-      heading: loc.coords.heading !== null && loc.coords.heading >= 0
+      heading: loc.coords.heading !== null && loc.coords.heading !== undefined && loc.coords.heading >= 0
         ? loc.coords.heading
         : undefined,
       timestamp: loc.timestamp,

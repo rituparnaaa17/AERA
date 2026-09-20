@@ -50,7 +50,6 @@ export async function predictSensorWindow(
       body: JSON.stringify({ sessionId, timestamp: new Date().toISOString(), window }),
     });
     if (!response.ok) {
-      console.warn(`[inferenceService] /predict returned ${response.status}`);
       return null;
     }
     const result = (await response.json()) as Partial<PredictionResult>;

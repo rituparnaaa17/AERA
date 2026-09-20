@@ -346,8 +346,20 @@ export function TripProvider({ children }: PropsWithChildren) {
 
   // ── Emergency sender ──────────────────────────────────────────────────────────
   const sendEmergency = useCallback(async () => {
-    if (!sessionRef.current) return;
+    // If no active session, create an emergency session ID so manual SOS always works
+    if (!sessionRef.current) {
+      const manualSession = createId();
+      sessionRef.current = manualSession;
+      setSessionId(manualSession);
+    }
     if (statusRef.current === 'EMERGENCY') return; // already sent
+
+    // Ensure all local emergency contacts are synced to the backend
+    if (contacts.length > 0) {
+      for (let i = 0; i < contacts.length; i++) {
+        void syncContact(contacts[i], i + 1);
+      }
+    }
 
     // Get freshest available location
     let location: LocationFix | null = null;
@@ -363,7 +375,7 @@ export function TripProvider({ children }: PropsWithChildren) {
     }
 
     await sendEmergencyAlert({
-      sessionId: sessionRef.current,
+      sessionId: sessionRef.current!,
       location: location ? {
         lat: location.lat,
         lng: location.lng,
@@ -373,7 +385,7 @@ export function TripProvider({ children }: PropsWithChildren) {
       } : null,
       timestamp: new Date().toISOString(),
       notifyEmergencyServices: settingsRef.current.notifyEmergencyServices,
-      confidence: confidenceRef.current ?? 0,
+      confidence: confidenceRef.current ?? 0.95,
     });
 
     setNetworkAvailable(true);
@@ -385,7 +397,7 @@ export function TripProvider({ children }: PropsWithChildren) {
     addEvent('EMERGENCY', 'Emergency alert sent');
     detectionStateRef.current = 'EMERGENCY';
     setDiagnostics((d) => ({ ...d, detectionState: 'EMERGENCY' }));
-  }, [addEvent]);
+  }, [addEvent, contacts]);
 
   // ── Alert trigger ─────────────────────────────────────────────────────────────
   const triggerAlert = useCallback(
@@ -864,7 +876,6 @@ export function TripProvider({ children }: PropsWithChildren) {
 
   // ── Manual SOS ────────────────────────────────────────────────────────────────
   const triggerManualSos = useCallback(async () => {
-    if (!tripActiveRef.current) return;
     addEvent('EMERGENCY', 'Manual SOS triggered');
     await sendEmergency();
   }, [addEvent, sendEmergency]);

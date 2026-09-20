@@ -111,6 +111,7 @@ export function TripRouteMap({
         style={StyleSheet.absoluteFill}
         initialRegion={region}
         region={region}
+        mapType={Platform.OS === 'android' ? 'none' : 'standard'}
         showsCompass={false}
         showsMyLocationButton={false}
         pitchEnabled={false}
@@ -121,14 +122,12 @@ export function TripRouteMap({
       >
         {/*
           OpenStreetMap raster tiles — free, no API key required. On Android
-          this overrides the blank Google Maps base tiles that were failing
-          to load without a `googleMaps.apiKey` in app.json. On iOS it
-          overlays Apple Maps with the same OSM tiles so both platforms
-          look identical.
+          mapType="none" prevents the black Google Maps placeholder from showing.
         */}
         <UrlTile
           urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           maximumZ={19}
+          tileSize={256}
           flipY={false}
         />
 
