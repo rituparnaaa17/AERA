@@ -21,10 +21,10 @@ export class AeraStack extends cdk.Stack {
     const userPool = new cognito.UserPool(this, 'AeraUserPool', {
       userPoolName: 'aera-user-pool',
       selfSignUpEnabled: true,
-      signInAliases: { email: true, phone: true },
-      autoVerify: { email: true, phone: true },
+      signInAliases: { email: true },
+      autoVerify: { email: true },
       standardAttributes: {
-        email: { required: false, mutable: true },
+        email: { required: true, mutable: true },
         fullname: { required: false, mutable: true },
         phoneNumber: { required: false, mutable: true },
       },
@@ -35,13 +35,12 @@ export class AeraStack extends cdk.Stack {
         requireDigits: true,
         requireSymbols: false,
       },
-      accountRecovery: cognito.AccountRecovery.EMAIL_AND_PHONE_WITHOUT_MFA,
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       userVerification: {
         emailSubject: 'AERA — Verify your email',
         emailBody:
           'Welcome to AERA! Your verification code is {####}. This code expires in 24 hours.',
         emailStyle: cognito.VerificationEmailStyle.CODE,
-        smsMessage: 'Welcome to AERA! Your verification code is {####}.',
       },
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
