@@ -26,7 +26,7 @@ import { AppBackground } from '@/components/AppBackground';
 import { Mascot } from '@/components/Mascot';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { QSafetyHalo } from '@/components/QSafetyHalo';
-import { useTrip } from '@/components/TripContext';
+import { useTrip, type Trip } from '@/components/TripContext';
 
 const NAVY = '#0F1E4A';
 const NAVY_SOFT = '#334155';
@@ -52,16 +52,23 @@ export default function TripCompleteScreen() {
     : 0;
   const emergencies = lastCompletedTrip?.emergencyTriggered ? 1 : 0;
 
-  // Trip Safety Score — a BAND based on what happened during the trip.
-  // This is NOT raw AI confidence. It is a safety rating.
-  // 96 = safe trip, 78 = had alerts, 52 = emergency triggered
-  const score = !lastCompletedTrip
-    ? 0
-    : lastCompletedTrip.emergencyTriggered
-    ? 52
-    : alerts
-    ? 78
-    : 96;
+  // Dynamically calculate Trip Safety Rating (0-100) from telemetry & window telemetry
+  const calculateScore = (trip: Trip | null): number => {
+    if (!trip) return 100;
+    const alertCount = trip.alertCount ?? trip.events.filter((e) => e.status === 'ALERT').length;
+    
+    if (trip.emergencyTriggered) {
+      const penalty = Math.min(55, alertCount * 12 + 25);
+      return Math.max(42, Math.round(100 - penalty));
+    }
+    if (trip.hadAlert || alertCount > 0) {
+      const penalty = Math.min(25, alertCount * 8);
+      return Math.max(72, Math.round(98 - penalty));
+    }
+    return 98;
+  };
+
+  const score = calculateScore(lastCompletedTrip);
 
   const scoreColor = score >= 90 ? SAFE : score >= 70 ? WARN : DANGER;
   const scoreLabel = score >= 90 ? 'Excellent' : score >= 70 ? 'Good' : 'Needs Review';

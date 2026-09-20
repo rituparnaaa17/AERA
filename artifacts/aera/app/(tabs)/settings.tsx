@@ -1,18 +1,13 @@
 /**
- * Settings — Batch 5.
+ * Settings — AERA
  *
- * Grouped rows on top of the main_theme background. Every toggle wires to a
- * real TripContext setter; no decorative controls that do nothing.
- *
- * Groups (matching the reference):
- *   • Safety        — Alert Countdown, Notify Emergency Services
- *   • Account       — Profile, Emergency Contacts
- *   • App           — Notifications, Location Services, About
- *   • Developer     — Demo Mode, Mock AI (only when devMode already exposed)
+ * Grouped rows for safety, account, notifications, and developer preferences.
+ * Includes user account details and Sign Out action.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StatusBar,
@@ -26,6 +21,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '@/components/AppBackground';
 import { useTrip } from '@/components/TripContext';
+import { getCurrentSession, signOut, type AuthSession } from '@/services/authService';
 
 const NAVY = '#0F1E4A';
 const NAVY_SOFT = '#334155';
@@ -35,6 +31,7 @@ const CARD_BORDER = '#E2ECF7';
 const SAFE = '#22C55E';
 const WARN = '#F59E0B';
 const BRAND_BLUE = '#2563EB';
+const DANGER = '#DC2626';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -47,6 +44,36 @@ export default function SettingsScreen() {
     permissionGranted,
     refreshPermission,
   } = useTrip();
+
+  const [session, setSession] = useState<AuthSession | null>(null);
+
+  useEffect(() => {
+    void getCurrentSession().then((sess) => setSession(sess));
+  }, []);
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out of AERA?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch {
+              // Safe to ignore
+            }
+            router.replace('/(auth)/login');
+          },
+        },
+      ],
+    );
+  };
+
+  const userEmailOrPhone = session?.email || 'Authenticated User';
 
   return (
     <AppBackground fadeStrength="default">
@@ -62,6 +89,25 @@ export default function SettingsScreen() {
         <View style={styles.pageHeader}>
           <Text style={styles.eyebrow}>PREFERENCES</Text>
           <Text style={styles.pageTitle}>Settings</Text>
+        </View>
+
+        {/* ── User Account Card ── */}
+        <View style={styles.userCard}>
+          <View style={styles.userAvatar}>
+            <Feather name="user" size={20} color={BRAND_BLUE} />
+          </View>
+          <View style={styles.userCopy}>
+            <Text style={styles.userName}>Logged In User</Text>
+            <Text style={styles.userHandle}>{userEmailOrPhone}</Text>
+          </View>
+          <Pressable
+            onPress={() => router.push('/profile' as never)}
+            style={styles.profileBtn}
+            hitSlop={6}
+          >
+            <Text style={styles.profileBtnText}>Profile</Text>
+            <Feather name="chevron-right" size={14} color={BRAND_BLUE} />
+          </Pressable>
         </View>
 
         {/* ── Safety ── */}
@@ -114,8 +160,8 @@ export default function SettingsScreen() {
             icon="user"
             iconBg="#DBEAFE"
             iconColor={BRAND_BLUE}
-            title="Profile"
-            body="Your name, contact and account details."
+            title="Profile & Account Details"
+            body={userEmailOrPhone}
             onPress={() => router.push('/profile' as never)}
           />
           <Divider />
@@ -141,7 +187,7 @@ export default function SettingsScreen() {
             onPress={() => router.push('/notifications' as never)}
           />
           <Divider />
-          {/* Location Services — real state row with Refresh action */}
+          {/* Location Services */}
           <View style={styles.row}>
             <View style={[styles.rowIcon, { backgroundColor: '#DBEAFE' }]}>
               <Feather name="map-pin" size={16} color={BRAND_BLUE} />
@@ -202,6 +248,12 @@ export default function SettingsScreen() {
             onChange={setMockAi}
           />
         </Group>
+
+        {/* ── Sign Out ── */}
+        <Pressable onPress={handleSignOut} style={styles.signOutBtn} accessibilityRole="button">
+          <Feather name="log-out" size={16} color={DANGER} />
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </Pressable>
       </ScrollView>
     </AppBackground>
   );
@@ -293,6 +345,40 @@ const styles = StyleSheet.create({
   eyebrow: { color: MUTED, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   pageTitle: { color: NAVY, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
 
+  // User card
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userCopy: { flex: 1, gap: 2 },
+  userName: { color: NAVY, fontSize: 15, fontWeight: '800' },
+  userHandle: { color: NAVY_SOFT, fontSize: 12 },
+  profileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+  },
+  profileBtnText: { color: BRAND_BLUE, fontSize: 12, fontWeight: '800' },
+
   sectionLabel: {
     color: NAVY_SOFT,
     fontSize: 11,
@@ -338,4 +424,19 @@ const styles = StyleSheet.create({
   pillIdle: { backgroundColor: '#F1F5F9', borderColor: CARD_BORDER },
   pillTextActive: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
   pillTextIdle: { color: NAVY_SOFT, fontSize: 11, fontWeight: '800' },
+
+  signOutBtn: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  signOutText: { color: DANGER, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
 });

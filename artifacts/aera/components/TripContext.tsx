@@ -435,29 +435,27 @@ export function TripProvider({ children }: PropsWithChildren) {
     // ── Multi-signal risk scoring ─────────────────────────────────────────────
     let riskScore = 0;
 
-    // Large deviation from calibrated baseline
-    if (deltaAccel > baselineStddevRef.current * 4) riskScore += 3;
+    // Peak acceleration threshold (> 2.2g or delta > 0.8g)
+    if (peakAccel > 2.2 || deltaAccel > 0.8) riskScore += 3;
+    if (peakAccel > 3.0) riskScore += 2;
 
-    // Absolute extreme acceleration (> 3.5g ≈ 34 m/s² but sensors report in g)
-    if (peakAccel > 3.5) riskScore += 2;
+    // Peak rotation / gyro threshold (> 2.0 rad/s)
+    if (peakGyro > 2.0) riskScore += 3;
 
-    // Significant rotation
-    if (peakGyro > 3.0) riskScore += 2;
+    // Deviation from baseline
+    if (deltaAccel > baselineStddevRef.current * 3) riskScore += 2;
 
-    // Speed context: moving vehicle amplifies risk
-    if (currentSpeed > 10 && deltaAccel > 1.5) riskScore += 3;
-    if (currentSpeed > 30 && peakAccel > 2.5) riskScore += 2;
+    // Speed context
+    if (currentSpeed > 10 && deltaAccel > 1.0) riskScore += 2;
 
-    // Stationary penalty: heavily penalize alerts when phone is not moving
-    if (currentSpeed < 2) riskScore -= 6;
+    // Stationary check: only apply penalty if NO peak motion detected
+    if (currentSpeed < 2 && peakAccel < 2.2 && peakGyro < 2.0) {
+      riskScore -= 3;
+    }
 
-    // Brief spike < 200ms probably not a crash
-    const spikeDuration = window.filter((s) => s.accelMag > baselineMeanRef.current + baselineStddevRef.current * 3).length;
-    if (spikeDuration < 3) riskScore -= 2; // very brief spike, likely noise
-
-    if (riskScore >= RISK_SCORE_THRESHOLD) {
-      const alertConfidence = Math.min(0.99, 0.6 + (riskScore - RISK_SCORE_THRESHOLD) * 0.05);
-      triggerAlert('Abnormal driving pattern detected', alertConfidence);
+    if (riskScore >= 5) {
+      const alertConfidence = Math.min(0.99, 0.72 + (riskScore - 5) * 0.05);
+      triggerAlert('Unusual motion anomaly detected', alertConfidence);
     }
   }, [triggerAlert]);
 

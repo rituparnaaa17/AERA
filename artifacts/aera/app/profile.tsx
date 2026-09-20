@@ -1,20 +1,11 @@
 /**
- * Profile — Batch 5.
+ * Profile — AERA
  *
- * The current build has no real backend/session store, so we render the
- * best we can from what's actually persisted (contact count from
- * TripContext) and expose the standard entry points around it.
- *
- * Logout flow:
- *   • Confirmation dialog before firing.
- *   • Clears the AsyncStorage keys we own for session-related preferences
- *     (`@aera/authed` if you later add real auth). Trip history,
- *     contacts, and safety settings are LEFT ALONE because they aren't
- *     coupled to a specific user in this architecture.
- *   • `router.replace('/(auth)/login')` prevents back-nav into the app.
+ * Renders real authenticated user session details from authService / AsyncStorage,
+ * contacts count, trip history count, and provides a full Sign Out action.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -26,11 +17,12 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '@/components/AppBackground';
 import { useTrip } from '@/components/TripContext';
+import { getCurrentSession, signOut, type AuthSession } from '@/services/authService';
+import { api } from '@/services/apiService';
 
 const NAVY = '#0F1E4A';
 const NAVY_SOFT = '#334155';
@@ -42,21 +34,35 @@ const DANGER = '#DC2626';
 const SAFE = '#22C55E';
 const WARN = '#F59E0B';
 
-// Session-related AsyncStorage keys we own. Add more here if the auth
-// flow starts storing real tokens.
-const SESSION_KEYS = [
-  '@aera/authed',
-  '@aera/session',
-];
-
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { contacts, trips } = useTrip();
 
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [profileName, setProfileName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const sess = await getCurrentSession();
+      setSession(sess);
+
+      // Try fetching backend profile details
+      try {
+        const res = await api.profile.get();
+        if (res && res.success && res.data.name) {
+          setProfileName(res.data.name);
+        }
+      } catch {
+        // Offline or backend unavailable
+      }
+    };
+    void loadUser();
+  }, []);
+
   const logout = () => {
     Alert.alert(
       'Log Out',
-      'Are you sure you want to log out?',
+      'Are you sure you want to log out of AERA?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -64,9 +70,9 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.multiRemove(SESSION_KEYS);
+              await signOut();
             } catch {
-              // Session keys may not exist yet — safe to ignore.
+              // Ignore cleanup error
             }
             router.replace('/(auth)/login');
           },
@@ -74,6 +80,10 @@ export default function ProfileScreen() {
       ],
     );
   };
+
+  const displayName = profileName || (session?.email ? session.email.split('@')[0] : 'AERA Driver');
+  const userIdentifier = session?.email || 'Logged in user';
+  const userIdSub = session?.userId ? `ID: ${session.userId.slice(0, 12)}…` : 'Device authenticated';
 
   return (
     <AppBackground fadeStrength="default">
@@ -103,8 +113,10 @@ export default function ProfileScreen() {
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.name}>AERA Driver</Text>
-          <Text style={styles.subtle}>Signed in on this device</Text>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.subtle}>{userIdentifier}</Text>
+          <Text style={styles.subtleMeta}>{userIdSub}</Text>
+
           <View style={styles.chipRow}>
             <View style={styles.chip}>
               <Feather name="users" size={11} color={SAFE} />
@@ -118,21 +130,17 @@ export default function ProfileScreen() {
         </View>
 
         {/* Actions */}
-        <Text style={styles.sectionLabel}>ACCOUNT</Text>
+        <Text style={styles.sectionLabel}>ACCOUNT DETAILS</Text>
         <View style={styles.group}>
-          <RowLink
-            icon="edit-3"
-            iconBg="#DBEAFE"
-            iconColor={BRAND_BLUE}
-            title="Edit Profile"
-            body="Update how the app addresses you."
-            onPress={() =>
-              Alert.alert(
-                'Coming soon',
-                'Editable profile fields will arrive with the account backend.',
-              )
-            }
-          />
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>LOGIN IDENTIFIER</Text>
+            <Text style={styles.infoValue}>{userIdentifier}</Text>
+          </View>
+          <Divider />
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>SECURITY STATE</Text>
+            <Text style={[styles.infoValue, { color: SAFE }]}>Cognito Authenticated</Text>
+          </View>
           <Divider />
           <RowLink
             icon="users"
@@ -148,7 +156,7 @@ export default function ProfileScreen() {
             iconBg="#EDE9FE"
             iconColor="#7C3AED"
             title="App Preferences"
-            body="Alert timing, notifications, more."
+            body="Alert timing, notifications, settings."
             onPress={() => router.push('/(tabs)/settings')}
           />
         </View>
@@ -169,7 +177,7 @@ export default function ProfileScreen() {
             iconBg="#FEF3C7"
             iconColor={WARN}
             title="Help & Support"
-            body="FAQ and how to reach us."
+            body="FAQ and product guidance."
             onPress={() => router.push('/about' as never)}
           />
           <Divider />
@@ -177,8 +185,8 @@ export default function ProfileScreen() {
             icon="info"
             iconBg="#E2ECF7"
             iconColor={NAVY_SOFT}
-            title="About"
-            body="Version, licenses and more."
+            title="About AERA"
+            body="Version and platform info."
             onPress={() => router.push('/about' as never)}
           />
         </View>
@@ -186,7 +194,7 @@ export default function ProfileScreen() {
         {/* Logout */}
         <Pressable onPress={logout} style={styles.logout} accessibilityRole="button">
           <Feather name="log-out" size={16} color={DANGER} />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>Sign Out</Text>
         </Pressable>
       </ScrollView>
     </AppBackground>
@@ -245,7 +253,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: CARD_BORDER,
     borderRadius: 24,
-    gap: 6,
+    gap: 4,
   },
   avatarWrap: {
     width: 96,
@@ -255,11 +263,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    marginBottom: 4,
   },
   avatar: { width: 100, height: 100 },
   name: { color: NAVY, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
-  subtle: { color: NAVY_SOFT, fontSize: 12 },
-  chipRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  subtle: { color: NAVY_SOFT, fontSize: 14, fontWeight: '600' },
+  subtleMeta: { color: MUTED, fontSize: 11 },
+  chipRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999,
@@ -281,6 +291,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 12, paddingHorizontal: 14,
   },
+  infoRow: {
+    paddingVertical: 12, paddingHorizontal: 14, gap: 2,
+  },
+  infoLabel: { color: MUTED, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  infoValue: { color: NAVY, fontSize: 14, fontWeight: '700' },
+
   rowIcon: {
     width: 34, height: 34, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
@@ -293,9 +309,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexDirection: 'row', alignItems: 'center', gap: 8,
     marginTop: 12,
-    paddingHorizontal: 18, paddingVertical: 12,
+    paddingHorizontal: 24, paddingVertical: 14,
     borderRadius: 999,
     backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5',
   },
-  logoutText: { color: DANGER, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+  logoutText: { color: DANGER, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
 });

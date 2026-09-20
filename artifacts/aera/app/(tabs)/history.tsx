@@ -57,7 +57,11 @@ const tripKind = (t: Trip): 'safe' | 'alert' | 'emergency' =>
   t.emergencyTriggered ? 'emergency' : t.hadAlert ? 'alert' : 'safe';
 const kindColor = (k: 'safe' | 'alert' | 'emergency') =>
   k === 'emergency' ? DANGER : k === 'alert' ? WARN : SAFE;
-const tripScore = (t: Trip) => (t.emergencyTriggered ? 52 : t.hadAlert ? 78 : 96);
+const tripScore = (t: Trip) => {
+  if (t.emergencyTriggered) return 45;
+  if (t.hadAlert || (t.alertCount ?? 0) > 0) return 78;
+  return 98;
+};
 const tripTitle = (t: Trip) => {
   const h = new Date(t.startedAt).getHours();
   if (h < 12) return 'Morning Trip';
