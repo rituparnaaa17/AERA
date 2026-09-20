@@ -146,7 +146,7 @@ export default function LandingScreen() {
         <Text style={styles.brand}>
           AERA
         </Text>
-        <Text style={styles.tagline}>People Safe. Journeys Brighter.</Text>
+        <Text style={styles.tagline}>Accident & Emergency Response Assistant</Text>
       </Animated.View>
 
       {/* Mascot */}

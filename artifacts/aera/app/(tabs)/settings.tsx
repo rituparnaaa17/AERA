@@ -39,8 +39,6 @@ export default function SettingsScreen() {
     settings,
     setNotifyEmergencyServices,
     setCountdownSeconds,
-    setDemoMode,
-    setMockAi,
     permissionGranted,
     refreshPermission,
   } = useTrip();
@@ -74,6 +72,10 @@ export default function SettingsScreen() {
   };
 
   const userEmailOrPhone = session?.email || 'Authenticated User';
+  const displayName =
+    session?.name?.trim() ||
+    (session?.email ? session.email.split('@')[0] : null) ||
+    'AERA Driver';
 
   return (
     <AppBackground fadeStrength="default">
@@ -97,7 +99,7 @@ export default function SettingsScreen() {
             <Feather name="user" size={20} color={BRAND_BLUE} />
           </View>
           <View style={styles.userCopy}>
-            <Text style={styles.userName}>Logged In User</Text>
+            <Text style={styles.userName}>{displayName}</Text>
             <Text style={styles.userHandle}>{userEmailOrPhone}</Text>
           </View>
           <Pressable
@@ -153,27 +155,18 @@ export default function SettingsScreen() {
           </View>
         </Group>
 
-        {/* ── Account ── */}
-        <SectionLabel>Account</SectionLabel>
-        <Group>
-          <RowLink
-            icon="user"
-            iconBg="#DBEAFE"
-            iconColor={BRAND_BLUE}
-            title="Profile & Account Details"
-            body={userEmailOrPhone}
-            onPress={() => router.push('/profile' as never)}
-          />
-          <Divider />
-          <RowLink
-            icon="users"
-            iconBg="#DCFCE7"
-            iconColor={SAFE}
-            title="Emergency Contacts"
-            body="Manage the circle notified during an alert."
-            onPress={() => router.push('/(tabs)/contacts')}
-          />
-        </Group>
+        {/*
+          NOTE: The Account section (Profile & Account Details / Emergency
+          Contacts) has been removed here to avoid duplicating what the
+          Profile screen and the Contacts tab already own. Both are still
+          reachable — Profile via the user card above and Contacts via the
+          bottom nav.
+
+          NOTE: The Developer section (Demo Mode / Mock AI) has been
+          removed from the user-facing Settings. The underlying flags in
+          `TripContext.settings` are still available for internal code
+          paths; they're just no longer exposed as user toggles.
+        */}
 
         {/* ── App ── */}
         <SectionLabel>App</SectionLabel>
@@ -222,30 +215,6 @@ export default function SettingsScreen() {
             title="About"
             body="Version, licenses and product info."
             onPress={() => router.push('/about' as never)}
-          />
-        </Group>
-
-        {/* ── Developer ── */}
-        <SectionLabel>Developer</SectionLabel>
-        <Group>
-          <RowToggle
-            icon="play-circle"
-            iconBg="#EDE9FE"
-            iconColor="#7C3AED"
-            title="Demo Mode"
-            body="Show simulation controls for presentations."
-            value={settings.demoMode}
-            onChange={setDemoMode}
-          />
-          <Divider />
-          <RowToggle
-            icon="cpu"
-            iconBg="#EDE9FE"
-            iconColor="#7C3AED"
-            title="Mock AI"
-            body="Use simulated inference instead of the API."
-            value={settings.mockAi}
-            onChange={setMockAi}
           />
         </Group>
 

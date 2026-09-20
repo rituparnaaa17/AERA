@@ -23,6 +23,7 @@ const STORAGE_KEYS = {
   refreshToken: '@aera/auth/refreshToken',
   userId: '@aera/auth/userId',
   email: '@aera/auth/email',
+  name: '@aera/auth/name',
 } as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,6 +34,11 @@ export interface AuthSession {
   refreshToken: string;
   userId: string;      // Cognito sub
   email: string;
+  /**
+   * User's display name — captured at signup and cached from the ID
+   * token's `name` claim on every sign-in / refresh.
+   */
+  name?: string;
 }
 
 export interface AuthError {
@@ -275,14 +281,18 @@ async function executeSignIn(username: string, password: string, originalIdentif
     throw { code: 'AuthenticationFailed', message: 'Authentication did not return tokens' } as AuthError;
   }
 
-  const userId = decodeJwtSub(result['IdToken'] ?? '');
+  const idToken = result['IdToken'] ?? '';
+  const claims = decodeJwtClaims(idToken);
+  const userId = (claims['sub'] as string) ?? '';
+  const nameClaim = (claims['name'] as string | undefined)?.trim();
 
   const session: AuthSession = {
-    idToken: result['IdToken'] ?? '',
+    idToken,
     accessToken: result['AccessToken'] ?? '',
     refreshToken: result['RefreshToken'] ?? '',
     userId,
     email: originalIdentifier.trim(),
+    name: nameClaim && nameClaim.length ? nameClaim : undefined,
   };
 
   await storeSession(session);
@@ -371,12 +381,13 @@ export async function confirmForgotPassword(
  * Returns null if not authenticated.
  */
 export async function getCurrentSession(): Promise<AuthSession | null> {
-  const [idToken, accessToken, refreshToken, userId, email] = await Promise.all([
+  const [idToken, accessToken, refreshToken, userId, email, name] = await Promise.all([
     AsyncStorage.getItem(STORAGE_KEYS.idToken),
     AsyncStorage.getItem(STORAGE_KEYS.accessToken),
     AsyncStorage.getItem(STORAGE_KEYS.refreshToken),
     AsyncStorage.getItem(STORAGE_KEYS.userId),
     AsyncStorage.getItem(STORAGE_KEYS.email),
+    AsyncStorage.getItem(STORAGE_KEYS.name),
   ]);
 
   if (!idToken || !accessToken || !userId) return null;
@@ -387,6 +398,7 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
     refreshToken: refreshToken ?? '',
     userId,
     email: email ?? '',
+    name: name ?? undefined,
   };
 }
 
@@ -429,12 +441,18 @@ export async function refreshSession(
   const result = data['AuthenticationResult'] as Record<string, string>;
   const session = await getCurrentSession();
 
+  const nextIdToken = result['IdToken'] ?? '';
+  const nextClaims = decodeJwtClaims(nextIdToken);
+  const nextName = (nextClaims['name'] as string | undefined)?.trim();
+
   const updated: AuthSession = {
-    idToken: result['IdToken'] ?? '',
+    idToken: nextIdToken,
     accessToken: result['AccessToken'] ?? '',
     refreshToken: result['RefreshToken'] ?? session?.refreshToken ?? '',
-    userId: session?.userId ?? decodeJwtSub(result['IdToken'] ?? ''),
+    userId: session?.userId ?? (nextClaims['sub'] as string) ?? '',
     email,
+    // Prefer the refreshed claim, then the last cached name.
+    name: (nextName && nextName.length ? nextName : session?.name) ?? undefined,
   };
 
   await storeSession(updated);
@@ -444,25 +462,35 @@ export async function refreshSession(
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function storeSession(session: AuthSession): Promise<void> {
-  await AsyncStorage.multiSet([
+  const pairs: [string, string][] = [
     [STORAGE_KEYS.idToken, session.idToken],
     [STORAGE_KEYS.accessToken, session.accessToken],
     [STORAGE_KEYS.refreshToken, session.refreshToken],
     [STORAGE_KEYS.userId, session.userId],
     [STORAGE_KEYS.email, session.email],
-  ]);
+  ];
+  pairs.push([STORAGE_KEYS.name, session.name ?? '']);
+  await AsyncStorage.multiSet(pairs);
 }
 
-function decodeJwtSub(token: string): string {
+/**
+ * Decode a Cognito ID/access token's payload. Returns an empty object if
+ * the token isn't a valid three-segment JWT.
+ */
+function decodeJwtClaims(token: string): Record<string, unknown> {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return '';
+    if (parts.length !== 3) return {};
     const payloadStr = base64Decode(parts[1]!);
-    const payload = JSON.parse(payloadStr) as Record<string, unknown>;
-    return (payload['sub'] as string) ?? '';
+    return JSON.parse(payloadStr) as Record<string, unknown>;
   } catch {
-    return '';
+    return {};
   }
+}
+
+// Kept as a small convenience for callers that only need `sub`.
+function decodeJwtSub(token: string): string {
+  return (decodeJwtClaims(token)['sub'] as string) ?? '';
 }
 
 function isTokenExpired(token: string): boolean {

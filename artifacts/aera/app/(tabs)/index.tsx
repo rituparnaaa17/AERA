@@ -10,8 +10,9 @@
  * • Everything on the shared `main_theme` background.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -28,6 +29,7 @@ import { MascotPose } from '@/components/Mascot';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { QSafetyHalo } from '@/components/QSafetyHalo';
 import { useTrip } from '@/components/TripContext';
+import { getCurrentSession, signOut } from '@/services/authService';
 
 const NAVY = '#0F1E4A';
 const NAVY_SOFT = '#334155';
@@ -82,6 +84,15 @@ export default function HomeDashboard() {
   const isEmergency = status === 'EMERGENCY';
   const isAlert = status === 'ALERT';
 
+  // Load the signed-in user's display name from the auth session.
+  const [userName, setUserName] = useState<string | null>(null);
+  useEffect(() => {
+    void getCurrentSession().then((sess) => {
+      if (sess?.name) setUserName(sess.name);
+    });
+  }, []);
+  const firstName = (userName ?? '').trim().split(/\s+/)[0] || 'Driver';
+
   // Real derived metrics
   const safeTrips = trips.filter((t) => !t.hadAlert).length;
   const totalAlerts = trips.reduce((s, t) => s + (t.alertCount ?? 0), 0);
@@ -106,6 +117,24 @@ export default function HomeDashboard() {
     ? 'driving'
     : 'wave';
 
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out of AERA?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch {
+            // signOut just clears local keys — if it throws we still leave.
+          }
+          router.replace('/(auth)/login');
+        },
+      },
+    ]);
+  };
+
   return (
     <AppBackground fadeStrength="default">
       <StatusBar barStyle="dark-content" />
@@ -121,19 +150,20 @@ export default function HomeDashboard() {
           <View style={{ flex: 1 }}>
             <Text style={styles.eyebrow}>DASHBOARD</Text>
             <Text style={styles.greeting}>
-              {getGreeting()}, Driver <Text style={styles.wave}>👋</Text>
+              {getGreeting()}, {firstName} <Text style={styles.wave}>👋</Text>
             </Text>
             <Text style={styles.greetingSub}>
-              <Text style={styles.qMark}>AERA</Text> is keeping an eye on your journey.
+              <Text style={styles.qMark}>Q</Text> is keeping an eye on your journey.
             </Text>
           </View>
           <Pressable
-            onPress={() => router.push('/(tabs)/settings')}
+            onPress={handleLogout}
             style={styles.iconBtn}
             hitSlop={8}
-            accessibilityLabel="Settings"
+            accessibilityLabel="Log out"
+            accessibilityRole="button"
           >
-            <Feather name="settings" size={18} color={NAVY} />
+            <Feather name="log-out" size={18} color={DANGER} />
           </Pressable>
         </View>
 
@@ -197,29 +227,6 @@ export default function HomeDashboard() {
           />
         </View>
 
-        {/* ── Last Trip summary (only when we have one) ── */}
-        {lastTrip && (
-          <Pressable
-            onPress={() => router.push(`/(tabs)/history?open=${encodeURIComponent(lastTrip.id)}`)}
-            style={styles.lastTripRow}
-            accessibilityLabel="Open last trip details"
-          >
-            <View style={styles.lastTripLeft}>
-              <Text style={styles.lastTripEyebrow}>LAST TRIP</Text>
-              <Text style={styles.lastTripTitle}>
-                {lastTrip.emergencyTriggered ? 'Emergency' : lastTrip.hadAlert ? 'Alerted' : 'Safe'}{' '}
-                · {lastTrip.distance.toFixed(1)} km
-              </Text>
-              <Text style={styles.lastTripMeta}>
-                {new Date(lastTrip.endedAt).toLocaleString([], {
-                  month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                })}
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={MUTED} />
-          </Pressable>
-        )}
-
         {/* ── Primary CTA ── */}
         <PrimaryButton
           label={tripActive ? 'Open Live Trip' : 'Start a Trip'}
@@ -232,8 +239,103 @@ export default function HomeDashboard() {
           style={styles.ctaBtn}
           testID="trip-toggle"
         />
+
+        {/* ── Last Trip (only when a trip exists) ── */}
+        {lastTrip && (
+          <Pressable
+            onPress={() => router.push(`/(tabs)/history?open=${encodeURIComponent(lastTrip.id)}`)}
+            style={styles.lastTripRow}
+            accessibilityLabel="Open last trip details"
+          >
+            <View style={[styles.lastTripBadge, {
+              backgroundColor:
+                lastTrip.emergencyTriggered ? DANGER + '18'
+                : lastTrip.hadAlert ? WARN + '18'
+                : SAFE + '18',
+            }]}>
+              <Feather
+                name={
+                  lastTrip.emergencyTriggered ? 'alert-octagon'
+                  : lastTrip.hadAlert ? 'alert-triangle'
+                  : 'check-circle'
+                }
+                size={16}
+                color={lastTrip.emergencyTriggered ? DANGER : lastTrip.hadAlert ? WARN : SAFE}
+              />
+            </View>
+            <View style={styles.lastTripLeft}>
+              <Text style={styles.lastTripEyebrow}>LAST TRIP</Text>
+              <Text style={styles.lastTripTitle}>
+                {lastTrip.emergencyTriggered ? 'Emergency' : lastTrip.hadAlert ? 'Alerted' : 'Safe'}
+                {' · '}{lastTrip.distance.toFixed(1)} km · {formatDuration(lastTrip.duration)}
+              </Text>
+              <Text style={styles.lastTripMeta}>
+                {new Date(lastTrip.endedAt).toLocaleString([], {
+                  month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                })}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={MUTED} />
+          </Pressable>
+        )}
+
+        {/* ── Q Safety Byte — permanent rotating tip. Local content only;
+             does not depend on trips, network, or backend. ── */}
+        <QSafetyByte />
       </ScrollView>
     </AppBackground>
+  );
+}
+
+// ─── Q Safety Byte ─────────────────────────────────────────────────────
+
+// Short, plainly-worded road-safety / journey-awareness tips. No stats,
+// no unsupported claims — just general habits any driver benefits from.
+const SAFETY_BYTES: string[] = [
+  'Keep your phone securely mounted before starting a trip.',
+  'A short pause before driving helps you check your route and surroundings.',
+  'Keep emergency contacts updated before longer journeys.',
+  'Avoid interacting with the phone while the vehicle is moving.',
+  'If you feel tired, stop somewhere safe before continuing.',
+  'Check that your seatbelt is fastened before you start moving.',
+  'Give yourself a little extra time on unfamiliar routes.',
+  'Slow down early — braking late strains both you and the vehicle.',
+  'Scan mirrors regularly, not just when you plan to change lanes.',
+  'On long drives, take a short break at least every two hours.',
+];
+
+function QSafetyByte() {
+  const [index, setIndex] = useState<number>(() =>
+    Math.floor(Math.random() * SAFETY_BYTES.length)
+  );
+  const tip = SAFETY_BYTES[index] ?? SAFETY_BYTES[0];
+  const cycle = () =>
+    setIndex((i) => {
+      if (SAFETY_BYTES.length <= 1) return i;
+      let next = i;
+      while (next === i) next = Math.floor(Math.random() * SAFETY_BYTES.length);
+      return next;
+    });
+
+  return (
+    <View style={styles.byteCard}>
+      <View style={styles.byteQ}>
+        <Text style={styles.byteQText}>Q</Text>
+      </View>
+      <View style={styles.byteBody}>
+        <Text style={styles.byteEyebrow}>Q SAFETY BYTE</Text>
+        <Text style={styles.byteText}>{tip}</Text>
+      </View>
+      <Pressable
+        onPress={cycle}
+        hitSlop={10}
+        style={styles.byteRefresh}
+        accessibilityRole="button"
+        accessibilityLabel="Show another safety tip"
+      >
+        <Feather name="refresh-cw" size={14} color={BRAND_BLUE} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -359,10 +461,56 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
+  lastTripBadge: {
+    width: 36, height: 36, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
   lastTripLeft: { flex: 1, gap: 2 },
   lastTripEyebrow: { color: MUTED, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   lastTripTitle: { color: NAVY, fontSize: 14, fontWeight: '800' },
   lastTripMeta: { color: MUTED, fontSize: 12 },
 
   ctaBtn: { alignSelf: 'stretch', marginTop: 4 },
+
+  // Q Safety Byte — compact permanent card
+  byteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  byteQ: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: BRAND_BLUE + '18',
+    borderWidth: 1,
+    borderColor: BRAND_BLUE + '55',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  byteQText: {
+    color: BRAND_BLUE,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    // Nudge the Q optically-centre inside the tile.
+    marginTop: -1,
+  },
+  byteBody: { flex: 1, gap: 2 },
+  byteEyebrow: { color: MUTED, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  byteText: { color: NAVY, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  byteRefresh: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: BRAND_BLUE + '10',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

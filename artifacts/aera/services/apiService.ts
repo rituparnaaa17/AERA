@@ -14,6 +14,16 @@ const API_BASE_URL = (
   process.env.EXPO_PUBLIC_API_GATEWAY_URL ?? ''
 ).replace(/\/$/, '');
 
+/**
+ * Public helper so callers can check whether the API layer is configured
+ * before invoking it. When this returns `false` the app is in valid
+ * offline-only mode and callers should skip network requests and fall
+ * back to local state — no warning spam is emitted.
+ */
+export function isApiConfigured(): boolean {
+  return API_BASE_URL.length > 0;
+}
+
 // ─── Response type ─────────────────────────────────────────────────────────────
 
 export interface ApiSuccess<T> {
@@ -37,7 +47,10 @@ async function apiFetch<T>(
   skipAuth = false,
 ): Promise<ApiResult<T> | null> {
   if (!API_BASE_URL) {
-    console.warn('[apiService] EXPO_PUBLIC_API_GATEWAY_URL is not set. Running offline.');
+    // Offline-first mode: no API gateway configured. Return null silently
+    // so callers can fall back to AsyncStorage / local state. Warning spam
+    // here is noise because "no gateway" is a valid, expected state on
+    // dev machines and offline installs.
     return null;
   }
 

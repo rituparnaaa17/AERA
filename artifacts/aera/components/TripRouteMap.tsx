@@ -127,6 +127,11 @@ export function TripRouteMap({
           <Text style={styles.distText}>{distanceKm.toFixed(1)} km</Text>
         </View>
       )}
+
+      {/* OpenStreetMap attribution */}
+      <View style={styles.attrib} pointerEvents="none">
+        <Text style={styles.attribText}>© OpenStreetMap contributors</Text>
+      </View>
     </View>
   );
 }
@@ -165,7 +170,19 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { color: NAVY, fontSize: 14, fontWeight: '800' },
   emptySub: { color: MUTED, fontSize: 12, textAlign: 'center' },
+
+  attrib: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+  },
+  attribText: { color: NAVY, fontSize: 9, fontWeight: '600' },
 });
 
 export default TripRouteMap;
+
 
