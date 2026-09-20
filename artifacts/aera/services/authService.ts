@@ -469,7 +469,7 @@ async function storeSession(session: AuthSession): Promise<void> {
     [STORAGE_KEYS.userId, session.userId],
     [STORAGE_KEYS.email, session.email],
   ];
-  if (session.name) pairs.push([STORAGE_KEYS.name, session.name]);
+  pairs.push([STORAGE_KEYS.name, session.name ?? '']);
   await AsyncStorage.multiSet(pairs);
 }
 
