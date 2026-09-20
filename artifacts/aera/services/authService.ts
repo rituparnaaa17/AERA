@@ -4,18 +4,17 @@
  * Amazon Cognito authentication using direct USER_SRP_AUTH / USER_PASSWORD_AUTH
  * HTTP calls. No Amplify, no AWS SDK in Expo. Tokens stored in AsyncStorage.
  *
- * Set these environment variables in your .env file:
- *   EXPO_PUBLIC_COGNITO_USER_POOL_ID=ap-south-1_XXXXXXXXX
- *   EXPO_PUBLIC_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
- *   EXPO_PUBLIC_COGNITO_REGION=ap-south-1
+ * Fallbacks to EXPO_PUBLIC_COGNITO_CLIENT_ID / EXPO_PUBLIC_COGNITO_REGION
+ * and deployed stack constants so authentication endpoints are guaranteed to connect.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COGNITO_CLIENT_ID, COGNITO_REGION } from '@/utils/constants';
 
-// ─── Configuration (injected at build time via Expo env vars) ─────────────────
-const REGION = process.env.EXPO_PUBLIC_COGNITO_REGION ?? 'ap-south-1';
-const CLIENT_ID = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID ?? '';
-const COGNITO_ENDPOINT = `https://cognito-idp.${REGION}.amazonaws.com/`;
+// ─── Configuration ─────────────────────────────────────────────────────────────
+const REGION = COGNITO_REGION || process.env.EXPO_PUBLIC_COGNITO_REGION || 'ap-south-1';
+const CLIENT_ID = COGNITO_CLIENT_ID || process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID || '15k0dlo5upacipgg1e71l9fsqe';
+const COGNITO_ENDPOINT = `https://cognito-idp.${REGION}.amazonaws.com`;
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 const STORAGE_KEYS = {
@@ -41,27 +40,91 @@ export interface AuthError {
   message: string;
 }
 
+// ─── Base64 Safe Decoder ───────────────────────────────────────────────────────
+function base64Decode(str: string): string {
+  try {
+    if (typeof atob === 'function') {
+      return atob(str);
+    }
+  } catch {
+    // Fall back to manual base64 decode if atob is unavailable or throws
+  }
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let output = '';
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) {
+    base64 += '=';
+  }
+  for (let i = 0; i < base64.length; ) {
+    const enc1 = chars.indexOf(base64.charAt(i++));
+    const enc2 = chars.indexOf(base64.charAt(i++));
+    const enc3 = chars.indexOf(base64.charAt(i++));
+    const enc4 = chars.indexOf(base64.charAt(i++));
+
+    const chr1 = (enc1 << 2) | (enc2 >> 4);
+    const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+    const chr3 = ((enc3 & 3) << 6) | enc4;
+
+    output += String.fromCharCode(chr1);
+    if (enc3 !== 64) output += String.fromCharCode(chr2);
+    if (enc4 !== 64) output += String.fromCharCode(chr3);
+  }
+  return output;
+}
+
 // ─── Cognito HTTP helper ───────────────────────────────────────────────────────
 
 async function cognitoRequest(target: string, body: object): Promise<Record<string, unknown>> {
-  const response = await fetch(COGNITO_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-amz-json-1.1',
-      'X-Amz-Target': target,
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  const data = (await response.json()) as Record<string, unknown>;
+  try {
+    const response = await fetch(COGNITO_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': target,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    const errorCode = (data['__type'] as string) ?? 'UnknownError';
-    const message = (data['message'] as string) ?? 'An authentication error occurred';
-    throw { code: errorCode, message } as AuthError;
+    clearTimeout(timeoutId);
+
+    const text = await response.text();
+    let data: Record<string, unknown> = {};
+    try {
+      data = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      data = { message: text };
+    }
+
+    if (!response.ok) {
+      const rawCode = (data['__type'] as string) ?? (data['code'] as string) ?? '';
+      const errorCode = rawCode.includes('#') ? rawCode.split('#').pop()! : rawCode || 'UnknownError';
+      const message = (data['message'] as string) ?? (data['Message'] as string) ?? 'An authentication error occurred';
+      throw { code: errorCode, message } as AuthError;
+    }
+
+    return data;
+  } catch (err) {
+    clearTimeout(timeoutId);
+
+    if ((err as AuthError)?.code && (err as AuthError).code !== 'UnknownError') {
+      throw err;
+    }
+
+    const isAbort = (err as Error)?.name === 'AbortError';
+    console.error('[cognitoRequest] error:', err);
+    throw {
+      code: isAbort ? 'AbortError' : 'NetworkError',
+      message: isAbort
+        ? 'Connection timed out. Please check your internet connection.'
+        : err instanceof Error
+          ? err.message
+          : 'Network request failed to Cognito',
+    } as AuthError;
   }
-
-  return data;
 }
 
 // ─── Auth Operations ──────────────────────────────────────────────────────────
@@ -79,7 +142,6 @@ export interface SignUpParams {
  */
 export function resolveCognitoUsername(identifier: string): string {
   const trimmed = identifier.trim();
-  // Check if identifier is a phone number (starts with + or contains digits)
   if (trimmed.startsWith('+') || /^\+?\d[\d\s\-\(\)]{7,}$/.test(trimmed)) {
     const e164 = normalizePhoneNumber(trimmed);
     const digits = e164.replace(/\D/g, '');
@@ -124,14 +186,31 @@ export async function signUp(params: SignUpParams): Promise<{ nextStep: 'CONFIRM
 
 /**
  * Confirm verification code (email OTP or SMS OTP) sent after signUp.
+ * Fallbacks to E.164 phone username if synthetic phone email username is not found.
  */
 export async function confirmSignUp(identifier: string, code: string): Promise<void> {
   const cognitoUsername = resolveCognitoUsername(identifier);
-  await cognitoRequest('AWSCognitoIdentityProviderService.ConfirmSignUp', {
-    ClientId: CLIENT_ID,
-    Username: cognitoUsername,
-    ConfirmationCode: code.trim(),
-  });
+  try {
+    await cognitoRequest('AWSCognitoIdentityProviderService.ConfirmSignUp', {
+      ClientId: CLIENT_ID,
+      Username: cognitoUsername,
+      ConfirmationCode: code.trim(),
+    });
+  } catch (err) {
+    const isPhone = identifier.trim().startsWith('+') || /^\+?\d[\d\s\-\(\)]{7,}$/.test(identifier.trim());
+    if (isPhone && (err as AuthError)?.code === 'UserNotFoundException') {
+      const rawPhone = normalizePhoneNumber(identifier.trim());
+      if (rawPhone !== cognitoUsername) {
+        await cognitoRequest('AWSCognitoIdentityProviderService.ConfirmSignUp', {
+          ClientId: CLIENT_ID,
+          Username: rawPhone,
+          ConfirmationCode: code.trim(),
+        });
+        return;
+      }
+    }
+    throw err;
+  }
 }
 
 /**
@@ -139,24 +218,54 @@ export async function confirmSignUp(identifier: string, code: string): Promise<v
  */
 export async function resendConfirmationCode(identifier: string): Promise<void> {
   const cognitoUsername = resolveCognitoUsername(identifier);
-  await cognitoRequest('AWSCognitoIdentityProviderService.ResendConfirmationCode', {
-    ClientId: CLIENT_ID,
-    Username: cognitoUsername,
-  });
+  try {
+    await cognitoRequest('AWSCognitoIdentityProviderService.ResendConfirmationCode', {
+      ClientId: CLIENT_ID,
+      Username: cognitoUsername,
+    });
+  } catch (err) {
+    const isPhone = identifier.trim().startsWith('+') || /^\+?\d[\d\s\-\(\)]{7,}$/.test(identifier.trim());
+    if (isPhone && (err as AuthError)?.code === 'UserNotFoundException') {
+      const rawPhone = normalizePhoneNumber(identifier.trim());
+      if (rawPhone !== cognitoUsername) {
+        await cognitoRequest('AWSCognitoIdentityProviderService.ResendConfirmationCode', {
+          ClientId: CLIENT_ID,
+          Username: rawPhone,
+        });
+        return;
+      }
+    }
+    throw err;
+  }
 }
 
 /**
  * Sign in with email or phone number and password using USER_PASSWORD_AUTH.
- * Stores tokens in AsyncStorage.
+ * Tries synthetic username first, and falls back to E.164 phone number if UserNotFound.
  */
 export async function signIn(identifier: string, password: string): Promise<AuthSession> {
   const cognitoUsername = resolveCognitoUsername(identifier);
 
+  try {
+    return await executeSignIn(cognitoUsername, password, identifier);
+  } catch (err) {
+    const isPhone = identifier.trim().startsWith('+') || /^\+?\d[\d\s\-\(\)]{7,}$/.test(identifier.trim());
+    if (isPhone && (err as AuthError)?.code === 'UserNotFoundException') {
+      const rawPhone = normalizePhoneNumber(identifier.trim());
+      if (rawPhone !== cognitoUsername) {
+        return await executeSignIn(rawPhone, password, identifier);
+      }
+    }
+    throw err;
+  }
+}
+
+async function executeSignIn(username: string, password: string, originalIdentifier: string): Promise<AuthSession> {
   const data = await cognitoRequest('AWSCognitoIdentityProviderService.InitiateAuth', {
     AuthFlow: 'USER_PASSWORD_AUTH',
     ClientId: CLIENT_ID,
     AuthParameters: {
-      USERNAME: cognitoUsername,
+      USERNAME: username,
       PASSWORD: password,
     },
   });
@@ -166,7 +275,6 @@ export async function signIn(identifier: string, password: string): Promise<Auth
     throw { code: 'AuthenticationFailed', message: 'Authentication did not return tokens' } as AuthError;
   }
 
-  // Decode the sub (userId) from the ID token
   const userId = decodeJwtSub(result['IdToken'] ?? '');
 
   const session: AuthSession = {
@@ -174,7 +282,7 @@ export async function signIn(identifier: string, password: string): Promise<Auth
     accessToken: result['AccessToken'] ?? '',
     refreshToken: result['RefreshToken'] ?? '',
     userId,
-    email: identifier.trim(),
+    email: originalIdentifier.trim(),
   };
 
   await storeSession(session);
@@ -187,7 +295,6 @@ export async function signIn(identifier: string, password: string): Promise<Auth
 export function normalizePhoneNumber(phone: string): string {
   const cleaned = phone.replace(/[\s\-\(\)]/g, '');
   if (cleaned.startsWith('+')) return cleaned;
-  // If 10 digits (Indian standard mobile number format), prefix +91
   if (/^\d{10}$/.test(cleaned)) return `+91${cleaned}`;
   return `+${cleaned}`;
 }
@@ -200,35 +307,68 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Initiate forgot-password flow — sends a verification code to the user's email.
+ * Initiate forgot-password flow — sends a verification code to the user's email or phone.
  */
-export async function forgotPassword(email: string): Promise<void> {
-  await cognitoRequest('AWSCognitoIdentityProviderService.ForgotPassword', {
-    ClientId: CLIENT_ID,
-    Username: email,
-  });
+export async function forgotPassword(identifier: string): Promise<void> {
+  const cognitoUsername = resolveCognitoUsername(identifier);
+  try {
+    await cognitoRequest('AWSCognitoIdentityProviderService.ForgotPassword', {
+      ClientId: CLIENT_ID,
+      Username: cognitoUsername,
+    });
+  } catch (err) {
+    const isPhone = identifier.trim().startsWith('+') || /^\+?\d[\d\s\-\(\)]{7,}$/.test(identifier.trim());
+    if (isPhone && (err as AuthError)?.code === 'UserNotFoundException') {
+      const rawPhone = normalizePhoneNumber(identifier.trim());
+      if (rawPhone !== cognitoUsername) {
+        await cognitoRequest('AWSCognitoIdentityProviderService.ForgotPassword', {
+          ClientId: CLIENT_ID,
+          Username: rawPhone,
+        });
+        return;
+      }
+    }
+    throw err;
+  }
 }
 
 /**
  * Complete forgot-password flow — confirms new password with the verification code.
  */
 export async function confirmForgotPassword(
-  email: string,
+  identifier: string,
   code: string,
   newPassword: string,
 ): Promise<void> {
-  await cognitoRequest('AWSCognitoIdentityProviderService.ConfirmForgotPassword', {
-    ClientId: CLIENT_ID,
-    Username: email,
-    ConfirmationCode: code,
-    Password: newPassword,
-  });
+  const cognitoUsername = resolveCognitoUsername(identifier);
+  try {
+    await cognitoRequest('AWSCognitoIdentityProviderService.ConfirmForgotPassword', {
+      ClientId: CLIENT_ID,
+      Username: cognitoUsername,
+      ConfirmationCode: code.trim(),
+      Password: newPassword,
+    });
+  } catch (err) {
+    const isPhone = identifier.trim().startsWith('+') || /^\+?\d[\d\s\-\(\)]{7,}$/.test(identifier.trim());
+    if (isPhone && (err as AuthError)?.code === 'UserNotFoundException') {
+      const rawPhone = normalizePhoneNumber(identifier.trim());
+      if (rawPhone !== cognitoUsername) {
+        await cognitoRequest('AWSCognitoIdentityProviderService.ConfirmForgotPassword', {
+          ClientId: CLIENT_ID,
+          Username: rawPhone,
+          ConfirmationCode: code.trim(),
+          Password: newPassword,
+        });
+        return;
+      }
+    }
+    throw err;
+  }
 }
 
 /**
  * Returns the current session from AsyncStorage.
  * Returns null if not authenticated.
- * Does NOT automatically refresh tokens — call refreshSession() if needed.
  */
 export async function getCurrentSession(): Promise<AuthSession | null> {
   const [idToken, accessToken, refreshToken, userId, email] = await Promise.all([
@@ -253,19 +393,16 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
 /**
  * Returns the current ID token for API Authorization headers.
  * Attempts token refresh if expired.
- * Returns null if not authenticated.
  */
 export async function getIdToken(): Promise<string | null> {
   const session = await getCurrentSession();
   if (!session) return null;
 
-  // Check if token is expired (Cognito tokens are 1-hour JWTs)
   if (isTokenExpired(session.idToken)) {
     try {
       const refreshed = await refreshSession(session.refreshToken, session.email);
       return refreshed.idToken;
     } catch {
-      // Refresh failed — user needs to re-authenticate
       await signOut();
       return null;
     }
@@ -320,7 +457,8 @@ function decodeJwtSub(token: string): string {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return '';
-    const payload = JSON.parse(atob(parts[1]!)) as Record<string, unknown>;
+    const payloadStr = base64Decode(parts[1]!);
+    const payload = JSON.parse(payloadStr) as Record<string, unknown>;
     return (payload['sub'] as string) ?? '';
   } catch {
     return '';
@@ -331,9 +469,9 @@ function isTokenExpired(token: string): boolean {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return true;
-    const payload = JSON.parse(atob(parts[1]!)) as Record<string, unknown>;
+    const payloadStr = base64Decode(parts[1]!);
+    const payload = JSON.parse(payloadStr) as Record<string, unknown>;
     const exp = payload['exp'] as number;
-    // Add 60-second buffer
     return Date.now() / 1000 > exp - 60;
   } catch {
     return true;
@@ -344,21 +482,34 @@ function isTokenExpired(token: string): boolean {
  * Maps Cognito error codes to user-friendly messages.
  */
 export function mapCognitoError(error: unknown): string {
-  const err = error as AuthError;
-  const code = err?.code ?? '';
+  if (!error) return 'An unknown error occurred.';
+
+  const errObj = typeof error === 'object' ? (error as Record<string, unknown>) : {};
+  const code = (errObj['code'] as string) || (errObj['name'] as string) || '';
+  const rawMsg = String(errObj['message'] || error);
+
+  if (
+    code === 'NetworkError' ||
+    code === 'AbortError' ||
+    rawMsg.includes('fetch failed') ||
+    rawMsg.includes('Network request failed') ||
+    rawMsg.includes('Failed to fetch') ||
+    rawMsg.includes('NetworkError')
+  ) {
+    return 'Unable to connect to authentication server. Please check your internet connection and try again.';
+  }
 
   const messages: Record<string, string> = {
-    UserNotFoundException: 'No account found with this email address.',
-    NotAuthorizedException: 'Incorrect email or password.',
-    UserNotConfirmedException: 'Please verify your email before signing in.',
-    UsernameExistsException: 'An account with this email already exists.',
-    CodeMismatchException: 'Invalid verification code. Please try again.',
-    ExpiredCodeException: 'This code has expired. Please request a new one.',
-    LimitExceededException: 'Too many attempts. Please try again later.',
-    InvalidPasswordException: err?.message ?? 'Password does not meet requirements.',
-    InvalidParameterException: err?.message ?? 'Invalid input. Please check your details.',
-    NetworkError: 'Network error. Please check your connection.',
+    UserNotFoundException: 'No account found with this email or phone number.',
+    NotAuthorizedException: 'Incorrect email/phone number or password.',
+    UserNotConfirmedException: 'Account unverified. Please check your email or phone for verification code.',
+    UsernameExistsException: 'An account with this email or phone already exists.',
+    CodeMismatchException: 'Invalid verification code. Please check and try again.',
+    ExpiredCodeException: 'Verification code has expired. Please request a new one.',
+    LimitExceededException: 'Too many attempts. Please try again in a few minutes.',
+    InvalidPasswordException: (errObj['message'] as string) ?? 'Password does not meet requirements.',
+    InvalidParameterException: (errObj['message'] as string) ?? 'Invalid input parameters.',
   };
 
-  return messages[code] ?? err?.message ?? 'Authentication failed. Please try again.';
+  return messages[code] ?? (errObj['message'] as string) ?? 'Authentication failed. Please try again.';
 }
