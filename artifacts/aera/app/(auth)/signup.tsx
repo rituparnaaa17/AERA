@@ -50,6 +50,7 @@ export default function SignupScreen() {
   const [error, setError] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmCode, setConfirmCode] = useState('');
+  const [resendNotice, setResendNotice] = useState('');
   const [success, setSuccess] = useState(false);
 
   const fade = useRef(new Animated.Value(0)).current;
@@ -83,6 +84,7 @@ export default function SignupScreen() {
       return;
     }
     setError('');
+    setResendNotice('');
     setLoading(true);
     try {
       await signUp({
@@ -123,6 +125,7 @@ export default function SignupScreen() {
     try {
       await resendConfirmationCode(activeUsername);
       setError('');
+      setResendNotice(`Verification code resent to ${activeUsername}. Check your Inbox and Spam / Junk folder.`);
     } catch (err: unknown) {
       setError(mapCognitoError(err));
     }
@@ -304,6 +307,19 @@ export default function SignupScreen() {
               </>
             ) : (
               <>
+                <View style={{ backgroundColor: 'rgba(59,130,246,0.15)', borderWidth: 1, borderColor: '#3B82F6', borderRadius: 14, padding: 14, marginBottom: 8 }}>
+                  <Text style={{ color: '#DBEAFE', fontSize: 13, lineHeight: 19 }}>
+                    A 6-digit verification code was sent to <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>{activeUsername}</Text>.
+                    {verificationMethod === 'email' ? ' Please check your inbox and Spam / Junk folder.' : ''}
+                  </Text>
+                </View>
+
+                {resendNotice ? (
+                  <View style={{ backgroundColor: 'rgba(34,197,94,0.15)', borderWidth: 1, borderColor: '#22C55E', borderRadius: 14, padding: 12, marginBottom: 8 }}>
+                    <Text style={{ color: '#86EFAC', fontSize: 13 }}>{resendNotice}</Text>
+                  </View>
+                ) : null}
+
                 <AuthField
                   label={`6-DIGIT ${verificationMethod === 'email' ? 'EMAIL' : 'SMS'} CODE`}
                   icon="hash"

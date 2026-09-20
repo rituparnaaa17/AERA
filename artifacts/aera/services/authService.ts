@@ -172,12 +172,19 @@ export async function signUp(params: SignUpParams): Promise<{ nextStep: 'CONFIRM
     if (!email?.trim()) throw { code: 'InvalidParameterException', message: 'Email address is required.' } as AuthError;
     cognitoUsername = email.trim().toLowerCase();
     userAttributes.push({ Name: 'email', Value: cognitoUsername });
+    if (phone?.trim()) {
+      userAttributes.push({ Name: 'phone_number', Value: normalizePhoneNumber(phone.trim()) });
+    }
   } else {
     if (!phone?.trim()) throw { code: 'InvalidParameterException', message: 'Phone number is required.' } as AuthError;
     const formattedPhone = normalizePhoneNumber(phone.trim());
     cognitoUsername = resolveCognitoUsername(formattedPhone);
     userAttributes.push({ Name: 'phone_number', Value: formattedPhone });
-    userAttributes.push({ Name: 'email', Value: cognitoUsername });
+    if (email?.trim()) {
+      userAttributes.push({ Name: 'email', Value: email.trim().toLowerCase() });
+    } else {
+      userAttributes.push({ Name: 'email', Value: cognitoUsername });
+    }
   }
 
   await cognitoRequest('AWSCognitoIdentityProviderService.SignUp', {
