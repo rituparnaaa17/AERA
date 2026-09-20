@@ -59,13 +59,13 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
     try {
-      await signIn(email.trim().toLowerCase(), password);
+      await signIn(email.trim(), password);
       router.replace('/(tabs)');
     } catch (err: unknown) {
       const friendly = mapCognitoError(err);
       setError(friendly);
       if ((err as { code?: string })?.code === 'UserNotConfirmedException') {
-        setError('Please verify your email first. Check your inbox for the confirmation code.');
+        setError('Please verify your account first using the code sent to your email or phone.');
       }
     } finally {
       setLoading(false);
@@ -119,11 +119,11 @@ export default function LoginScreen() {
             ) : null}
 
             <AuthField
-              label="EMAIL"
-              icon="mail"
+              label="EMAIL OR PHONE NUMBER"
+              icon="user"
               value={email}
               onChangeText={setEmail}
-              placeholder="you@example.com"
+              placeholder="you@example.com or +919876543210"
               keyboardType="email-address"
               autoCapitalize="none"
               returnKeyType="next"

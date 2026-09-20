@@ -66,27 +66,40 @@ async function cognitoRequest(target: string, body: object): Promise<Record<stri
 
 // ─── Auth Operations ──────────────────────────────────────────────────────────
 
+export interface SignUpParams {
+  name: string;
+  password: string;
+  verificationMethod: 'email' | 'phone';
+  email?: string;
+  phone?: string;
+}
+
 /**
- * Sign up a new user.
- * Returns: 'CONFIRM_SIGN_UP' — user needs to verify email.
+ * Sign up a new user using EITHER email OR phone number verification.
+ * The user verifies ONLY ONE contact method via Cognito OTP.
  */
-export async function signUp(
-  email: string,
-  password: string,
-  name: string,
-  phone?: string,
-): Promise<{ nextStep: 'CONFIRM_SIGN_UP' }> {
+export async function signUp(params: SignUpParams): Promise<{ nextStep: 'CONFIRM_SIGN_UP' }> {
+  const { name, password, verificationMethod, email, phone } = params;
+
+  let username = '';
   const userAttributes: Array<{ Name: string; Value: string }> = [
-    { Name: 'email', Value: email },
-    { Name: 'name', Value: name },
+    { Name: 'name', Value: name.trim() },
   ];
-  if (phone) {
-    userAttributes.push({ Name: 'phone_number', Value: phone });
+
+  if (verificationMethod === 'email') {
+    if (!email?.trim()) throw { code: 'InvalidParameterException', message: 'Email address is required.' } as AuthError;
+    username = email.trim().toLowerCase();
+    userAttributes.push({ Name: 'email', Value: username });
+  } else {
+    if (!phone?.trim()) throw { code: 'InvalidParameterException', message: 'Phone number is required.' } as AuthError;
+    // Normalize phone number to E.164 format
+    username = normalizePhoneNumber(phone.trim());
+    userAttributes.push({ Name: 'phone_number', Value: username });
   }
 
   await cognitoRequest('AWSCognitoIdentityProviderService.SignUp', {
     ClientId: CLIENT_ID,
-    Username: email,
+    Username: username,
     Password: password,
     UserAttributes: userAttributes,
   });
@@ -95,36 +108,42 @@ export async function signUp(
 }
 
 /**
- * Confirm email verification code sent after signUp.
+ * Confirm verification code (email OTP or SMS OTP) sent after signUp.
  */
-export async function confirmSignUp(email: string, code: string): Promise<void> {
+export async function confirmSignUp(username: string, code: string): Promise<void> {
+  const normalizedUsername = username.startsWith('+') ? username : username.trim().toLowerCase();
   await cognitoRequest('AWSCognitoIdentityProviderService.ConfirmSignUp', {
     ClientId: CLIENT_ID,
-    Username: email,
-    ConfirmationCode: code,
+    Username: normalizedUsername,
+    ConfirmationCode: code.trim(),
   });
 }
 
 /**
- * Resend the email verification code.
+ * Resend verification code to user's selected contact method (email or phone).
  */
-export async function resendConfirmationCode(email: string): Promise<void> {
+export async function resendConfirmationCode(username: string): Promise<void> {
+  const normalizedUsername = username.startsWith('+') ? username : username.trim().toLowerCase();
   await cognitoRequest('AWSCognitoIdentityProviderService.ResendConfirmationCode', {
     ClientId: CLIENT_ID,
-    Username: email,
+    Username: normalizedUsername,
   });
 }
 
 /**
- * Sign in with email and password using USER_PASSWORD_AUTH.
+ * Sign in with email or phone number and password using USER_PASSWORD_AUTH.
  * Stores tokens in AsyncStorage.
  */
-export async function signIn(email: string, password: string): Promise<AuthSession> {
+export async function signIn(identifier: string, password: string): Promise<AuthSession> {
+  const normalizedUsername = identifier.startsWith('+')
+    ? identifier.trim()
+    : identifier.trim().toLowerCase();
+
   const data = await cognitoRequest('AWSCognitoIdentityProviderService.InitiateAuth', {
     AuthFlow: 'USER_PASSWORD_AUTH',
     ClientId: CLIENT_ID,
     AuthParameters: {
-      USERNAME: email,
+      USERNAME: normalizedUsername,
       PASSWORD: password,
     },
   });
@@ -142,11 +161,22 @@ export async function signIn(email: string, password: string): Promise<AuthSessi
     accessToken: result['AccessToken'] ?? '',
     refreshToken: result['RefreshToken'] ?? '',
     userId,
-    email,
+    email: normalizedUsername,
   };
 
   await storeSession(session);
   return session;
+}
+
+/**
+ * Normalizes phone numbers to E.164 format. Defaults to +91 if no country code provided.
+ */
+export function normalizePhoneNumber(phone: string): string {
+  const cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  if (cleaned.startsWith('+')) return cleaned;
+  // If 10 digits (Indian standard mobile number format), prefix +91
+  if (/^\d{10}$/.test(cleaned)) return `+91${cleaned}`;
+  return `+${cleaned}`;
 }
 
 /**

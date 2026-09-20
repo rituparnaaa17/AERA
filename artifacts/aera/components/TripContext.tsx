@@ -835,11 +835,15 @@ export function TripProvider({ children }: PropsWithChildren) {
   // ── Acknowledge OK ────────────────────────────────────────────────────────────
   const acknowledgeOk = useCallback(() => {
     if (statusRef.current !== 'ALERT') return;
-    // Mark the current event as dismissed and enter cooldown
+    // Mark the current event as dismissed and enter 30s cooldown
     dismissedAlertIdRef.current = currentAlertIdRef.current;
     cooldownUntilRef.current = Date.now() + POST_DISMISS_COOLDOWN_MS;
     currentAlertIdRef.current = null;
     detectionStateRef.current = 'MONITORING';
+
+    // Clear buffer so old samples belonging to this event do not re-trigger
+    sensorBuffer.current.clear();
+    rollingBufferRef.current = [];
 
     setStatus('SAFE');
     setAlertExpiresAt(null);

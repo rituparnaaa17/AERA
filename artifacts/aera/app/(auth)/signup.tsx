@@ -1,9 +1,8 @@
 /**
  * Sign Up — AERA
  *
- * Fields: Name, Email, Password.
- * Primary Create Account → mock signup then Sign In screen.
- * Footer → (auth)/login
+ * Single-Verification Signup Flow:
+ * Allows user to choose verification via Email OTP OR Phone SMS OTP (NOT BOTH).
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -28,7 +27,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthField } from '@/components/AuthField';
 import { Mascot } from '@/components/Mascot';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { signUp, confirmSignUp, resendConfirmationCode, mapCognitoError } from '@/services/authService';
+import {
+  signUp,
+  confirmSignUp,
+  resendConfirmationCode,
+  mapCognitoError,
+  normalizePhoneNumber,
+} from '@/services/authService';
 
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
@@ -36,6 +41,7 @@ export default function SignupScreen() {
   const phoneRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
+  const [verificationMethod, setVerificationMethod] = useState<'email' | 'phone'>('email');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -55,13 +61,21 @@ export default function SignupScreen() {
     ]).start();
   }, [fade, rise]);
 
+  const activeUsername = verificationMethod === 'email'
+    ? email.trim().toLowerCase()
+    : normalizePhoneNumber(phone.trim());
+
   const handleSignup = async () => {
-    if (!name.trim() || !email.trim() || !password) {
-      setError('Please fill in required fields.');
+    if (!name.trim()) {
+      setError('Please enter your full name.');
       return;
     }
-    if (phone.trim() && !/^\+[1-9]\d{1,14}$/.test(phone.trim())) {
-      setError('Phone number must be in E.164 format (e.g. +919876543210).');
+    if (verificationMethod === 'email' && !email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (verificationMethod === 'phone' && !phone.trim()) {
+      setError('Please enter your phone number.');
       return;
     }
     if (password.length < 8) {
@@ -71,7 +85,13 @@ export default function SignupScreen() {
     setError('');
     setLoading(true);
     try {
-      await signUp(email.trim().toLowerCase(), password, name.trim(), phone.trim() || undefined);
+      await signUp({
+        name: name.trim(),
+        password,
+        verificationMethod,
+        email: email.trim(),
+        phone: phone.trim(),
+      });
       setShowConfirm(true);
     } catch (err: unknown) {
       setError(mapCognitoError(err));
@@ -82,13 +102,13 @@ export default function SignupScreen() {
 
   const handleConfirm = async () => {
     if (!confirmCode.trim()) {
-      setError('Please enter the verification code from your email.');
+      setError(`Please enter the 6-digit code sent to your ${verificationMethod === 'email' ? 'email' : 'phone'}.`);
       return;
     }
     setError('');
     setLoading(true);
     try {
-      await confirmSignUp(email.trim().toLowerCase(), confirmCode.trim());
+      await confirmSignUp(activeUsername, confirmCode.trim());
       setSuccess(true);
       await new Promise((r) => setTimeout(r, 1500));
       router.replace('/(auth)/login');
@@ -101,7 +121,7 @@ export default function SignupScreen() {
 
   const handleResendCode = async () => {
     try {
-      await resendConfirmationCode(email.trim().toLowerCase());
+      await resendConfirmationCode(activeUsername);
       setError('');
     } catch (err: unknown) {
       setError(mapCognitoError(err));
@@ -139,9 +159,15 @@ export default function SignupScreen() {
 
           <Animated.View style={[styles.header, { opacity: fade, transform: [{ translateY: rise }] }]}>
             <Mascot pose="wink" size={128} />
-            <Text style={styles.title}>{showConfirm ? 'Verify your email' : 'Create your account'}</Text>
+            <Text style={styles.title}>
+              {showConfirm
+                ? `Verify your ${verificationMethod}`
+                : 'Create your account'}
+            </Text>
             <Text style={styles.subtitle}>
-              {showConfirm ? `We sent a code to ${email}` : "Let's get you protected."}
+              {showConfirm
+                ? `We sent a code to ${activeUsername}`
+                : 'Choose your preferred verification method below.'}
             </Text>
           </Animated.View>
 
@@ -156,46 +182,107 @@ export default function SignupScreen() {
             {success ? (
               <View style={styles.errorBanner}>
                 <Feather name="check-circle" size={14} color="#86EFAC" />
-                <Text style={[styles.errorText, { color: '#86EFAC' }]}>Account verified! Redirecting…</Text>
+                <Text style={[styles.errorText, { color: '#86EFAC' }]}>Account verified! Redirecting to login…</Text>
               </View>
             ) : null}
 
             {!showConfirm ? (
               <>
+                {/* Method selector tabs */}
+                <View style={styles.methodToggleContainer}>
+                  <Pressable
+                    style={[
+                      styles.methodTab,
+                      verificationMethod === 'email' && styles.methodTabActive,
+                    ]}
+                    onPress={() => {
+                      setVerificationMethod('email');
+                      setError('');
+                    }}
+                  >
+                    <Feather
+                      name="mail"
+                      size={16}
+                      color={verificationMethod === 'email' ? '#60A5FA' : '#94A3B8'}
+                    />
+                    <Text
+                      style={[
+                        styles.methodTabText,
+                        verificationMethod === 'email' && styles.methodTabTextActive,
+                      ]}
+                    >
+                      Email OTP
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.methodTab,
+                      verificationMethod === 'phone' && styles.methodTabActive,
+                    ]}
+                    onPress={() => {
+                      setVerificationMethod('phone');
+                      setError('');
+                    }}
+                  >
+                    <Feather
+                      name="smartphone"
+                      size={16}
+                      color={verificationMethod === 'phone' ? '#60A5FA' : '#94A3B8'}
+                    />
+                    <Text
+                      style={[
+                        styles.methodTabText,
+                        verificationMethod === 'phone' && styles.methodTabTextActive,
+                      ]}
+                    >
+                      SMS OTP
+                    </Text>
+                  </Pressable>
+                </View>
+
                 <AuthField
                   label="FULL NAME"
                   icon="user"
                   value={name}
                   onChangeText={setName}
-                  placeholder="Your name"
+                  placeholder="Your full name"
                   autoCapitalize="words"
                   returnKeyType="next"
-                  onSubmitEditing={() => emailRef.current?.focus()}
+                  onSubmitEditing={() => {
+                    if (verificationMethod === 'email') emailRef.current?.focus();
+                    else phoneRef.current?.focus();
+                  }}
                 />
-                <AuthField
-                  ref={emailRef}
-                  label="EMAIL"
-                  icon="mail"
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  returnKeyType="next"
-                  onSubmitEditing={() => phoneRef.current?.focus()}
-                />
-                <AuthField
-                  ref={phoneRef}
-                  label="PHONE NUMBER (OPTIONAL)"
-                  icon="phone"
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="+919876543210"
-                  keyboardType="phone-pad"
-                  autoCapitalize="none"
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                />
+
+                {verificationMethod === 'email' ? (
+                  <AuthField
+                    ref={emailRef}
+                    label="EMAIL ADDRESS"
+                    icon="mail"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+                ) : (
+                  <AuthField
+                    ref={phoneRef}
+                    label="MOBILE PHONE NUMBER"
+                    icon="phone"
+                    value={phone}
+                    onChangeText={setPhone}
+                    placeholder="+919876543210"
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+                )}
+
                 <AuthField
                   ref={passwordRef}
                   label="PASSWORD"
@@ -209,7 +296,7 @@ export default function SignupScreen() {
                 />
 
                 <PrimaryButton
-                  label={loading ? 'Creating…' : 'Create Account'}
+                  label={loading ? 'Creating Account…' : 'Create Account'}
                   onPress={() => void handleSignup()}
                   loading={loading}
                   style={styles.ctaSpacing}
@@ -218,18 +305,18 @@ export default function SignupScreen() {
             ) : (
               <>
                 <AuthField
-                  label="VERIFICATION CODE"
+                  label={`6-DIGIT ${verificationMethod === 'email' ? 'EMAIL' : 'SMS'} CODE`}
                   icon="hash"
                   value={confirmCode}
                   onChangeText={setConfirmCode}
-                  placeholder="6-digit code"
+                  placeholder="123456"
                   keyboardType="number-pad"
                   returnKeyType="done"
                   onSubmitEditing={() => void handleConfirm()}
                 />
 
                 <PrimaryButton
-                  label={loading ? 'Verifying…' : 'Verify Email'}
+                  label={loading ? 'Verifying…' : `Verify ${verificationMethod === 'email' ? 'Email' : 'Phone'}`}
                   onPress={() => void handleConfirm()}
                   loading={loading}
                   style={styles.ctaSpacing}
@@ -253,6 +340,7 @@ export default function SignupScreen() {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#040D24' },
   scroll: { paddingHorizontal: 24, gap: 18 },
@@ -280,6 +368,39 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(8, 20, 55, 0.55)',
     borderWidth: 1,
     borderColor: 'rgba(96, 165, 250, 0.20)',
+  },
+
+  methodToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  methodTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  methodTabActive: {
+    backgroundColor: 'rgba(30, 58, 138, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.4)',
+  },
+  methodTabText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  methodTabTextActive: {
+    color: '#60A5FA',
+    fontWeight: '700',
   },
 
   errorBanner: {
