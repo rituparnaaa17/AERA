@@ -40,9 +40,10 @@ type Range = 'week' | 'month' | 'all';
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
-const tripKind = (t: Trip): 'safe' | 'alert' | 'emergency' =>
-  t.emergencyTriggered ? 'emergency' : t.hadAlert ? 'alert' : 'safe';
-const tripScore = (t: Trip) => (t.emergencyTriggered ? 52 : t.hadAlert ? 78 : 96);
+import { getTripKind, calculateTripScore } from '@/utils/tripUtils';
+
+const tripKind = (t: Trip) => getTripKind(t);
+const tripScore = (t: Trip) => calculateTripScore(t);
 const bandColor = (score: number) =>
   score >= 90 ? SAFE : score >= 70 ? WARN : DANGER;
 const bandLabel = (score: number) =>

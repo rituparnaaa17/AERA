@@ -61,21 +61,23 @@ const fmtRelative = (iso: string) => {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 };
 
+import { getTripKind, calculateTripScore } from '@/utils/tripUtils';
+
 const buildFeed = (trips: Trip[]): Notification[] => {
   const feed: Notification[] = [];
   const recent = trips.slice(0, 8);
 
   for (const t of recent) {
+    const kind = getTripKind(t);
+    const score = calculateTripScore(t);
     // Trip completed entry (real trip)
     feed.push({
       id: `${t.id}::done`,
       category: 'system',
-      tone: t.emergencyTriggered ? 'danger' : t.hadAlert ? 'warn' : 'safe',
+      tone: kind === 'emergency' ? 'danger' : kind === 'alert' ? 'warn' : 'safe',
       icon: 'flag',
       title: 'Trip Completed',
-      body: `${t.distance.toFixed(1)} km · ${Math.floor(t.duration / 60)} min · Score ${
-        t.emergencyTriggered ? 52 : t.hadAlert ? 78 : 96
-      }.`,
+      body: `${t.distance.toFixed(1)} km · ${Math.floor(t.duration / 60)} min · Score ${score}.`,
       when: fmtRelative(t.endedAt),
       ts: new Date(t.endedAt).getTime(),
     });

@@ -37,7 +37,8 @@ import { predictSensorWindow, simulatePrediction, PredictionStatus } from '@/ser
 import { DEFAULT_COUNTDOWN_SECONDS } from '@/utils/constants';
 import { SensorWindowBuffer } from '@/services/sensorService';
 import { loadStoredState, saveStoredState } from '@/services/storageService';
-import { api } from '@/services/apiService';
+import { getCurrentSession } from '@/services/authService';
+import { api, type TripResponse, type ContactResponse } from '@/services/apiService';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -158,6 +159,7 @@ type TripContextValue = {
   lastEventLabel: string;
   lastCompletedTrip: Trip | null;
   dismissCompletedTrip: () => void;
+  reloadUserSession: () => Promise<void>;
 };
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
@@ -279,21 +281,100 @@ export function TripProvider({ children }: PropsWithChildren) {
     speedKmhRef.current = speedKmh;
   }, [status, sessionId, tripActive, settings, confidence, speedKmh]);
 
-  // ── Hydration ─────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      const stored = await loadStoredState();
-      setTrips(stored.trips);
-      setContacts(stored.contacts);
-      setSettings({ ...defaultSettings, ...stored.settings });
+  const [activeUserId, setActiveUserId] = useState<string | null>(null);
+  const activeUserIdRef = useRef<string | null>(null);
+
+  // ── User Session Hydration & AWS Remote Sync ─────────────────────────────────
+  const reloadUserSession = useCallback(async () => {
+    const session = await getCurrentSession();
+    const userId = session?.userId ?? null;
+    activeUserIdRef.current = userId;
+    setActiveUserId(userId);
+
+    if (!userId) {
+      setTrips([]);
+      setContacts([]);
+      setSettings(defaultSettings);
       setHydrated(true);
-    };
-    void load();
+      return;
+    }
+
+    // Load local storage namespaced strictly by user's Cognito sub
+    const stored = await loadStoredState(userId);
+    const sanitizedTrips = stored.trips.map((t) => {
+      const hasEventsArray = Array.isArray(t.events) && t.events.length > 0;
+      const hasEmergencyEvent = hasEventsArray && t.events.some((e) => e.status === 'EMERGENCY');
+      const alertCount = t.alertCount ?? (hasEventsArray ? t.events.filter((e) => e.status === 'ALERT').length : 0);
+      const hasAlertEvent = hasEventsArray && t.events.some((e) => e.status === 'ALERT');
+
+      return {
+        ...t,
+        emergencyTriggered: hasEmergencyEvent || (!hasEventsArray && Boolean(t.emergencyTriggered)),
+        hadAlert: hasAlertEvent || alertCount > 0 || (!hasEventsArray && Boolean(t.hadAlert)),
+        alertCount,
+      };
+    });
+
+    setTrips(sanitizedTrips);
+    setContacts(stored.contacts);
+    setSettings({ ...defaultSettings, ...stored.settings });
+    setHydrated(true);
+
+    // Non-blocking sync with AWS backend for current authenticated user
+    try {
+      const [remoteTripsRes, remoteContactsRes] = await Promise.all([
+        api.trips.list().catch(() => null),
+        api.contacts.list().catch(() => null),
+      ]);
+
+      if (remoteTripsRes && remoteTripsRes.success && Array.isArray(remoteTripsRes.data) && remoteTripsRes.data.length > 0) {
+        const fetchedTrips: Trip[] = remoteTripsRes.data.map((rt: TripResponse) => ({
+          id: rt.tripId,
+          startedAt: rt.startTime,
+          endedAt: rt.endTime ?? rt.startTime,
+          duration: rt.duration ?? 0,
+          distance: rt.distance ?? 0,
+          hadAlert: Boolean(rt.alertCount && rt.alertCount > 0),
+          events: [],
+          alertCount: rt.alertCount ?? 0,
+          emergencyTriggered: Boolean(rt.emergencyTriggered),
+          safeWindows: rt.safeWindows ?? 0,
+        }));
+
+        setTrips((localTrips) => {
+          const map = new Map<string, Trip>();
+          for (const t of localTrips) map.set(t.id, t);
+          for (const rt of fetchedTrips) {
+            if (!map.has(rt.id)) map.set(rt.id, rt);
+          }
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+          );
+        });
+      }
+
+      if (remoteContactsRes && remoteContactsRes.success && Array.isArray(remoteContactsRes.data) && remoteContactsRes.data.length > 0) {
+        const fetchedContacts: Contact[] = remoteContactsRes.data.map((rc: ContactResponse) => ({
+          id: rc.contactId,
+          name: rc.name,
+          phone: rc.phone,
+          email: rc.email ?? '',
+        }));
+
+        setContacts(fetchedContacts);
+      }
+    } catch (err) {
+      console.warn('[TripContext] Remote AWS sync error:', err);
+    }
   }, []);
 
   useEffect(() => {
+    void reloadUserSession();
+  }, [reloadUserSession]);
+
+  useEffect(() => {
     if (!hydrated) return;
-    void saveStoredState({ trips, contacts, settings });
+    void saveStoredState(activeUserIdRef.current, { trips, contacts, settings });
   }, [hydrated, trips, contacts, settings]);
 
   const addEvent = useCallback((eventStatus: TripEvent['status'], label: string) => {
@@ -710,6 +791,7 @@ export function TripProvider({ children }: PropsWithChildren) {
     currentAlertIdRef.current = null;
     dismissedAlertIdRef.current = null;
     sessionRef.current = nextSession;
+    statusRef.current = 'SAFE';
     tripActiveRef.current = true;
 
     setTripActive(true);
@@ -767,16 +849,20 @@ export function TripProvider({ children }: PropsWithChildren) {
     const currentDistance = distanceKm;
     const currentWindows = windowsProcessed;
 
+    const hasEmergency = currentEvents.some((e) => e.status === 'EMERGENCY');
+    const alertCount = currentEvents.filter((e) => e.status === 'ALERT').length;
+    const hasAlert = alertCount > 0 || currentEvents.some((e) => e.status === 'ALERT');
+
     const nextTrip: Trip = {
       id: currentSession,
       startedAt: tripStartedAt,
       endedAt,
       duration: currentElapsed,
       distance: currentDistance,
-      hadAlert: currentEvents.some((e) => e.status === 'ALERT' || e.status === 'EMERGENCY'),
+      hadAlert: hasAlert,
       events: currentEvents,
-      alertCount: currentEvents.filter((e) => e.status === 'ALERT').length,
-      emergencyTriggered: currentEvents.some((e) => e.status === 'EMERGENCY'),
+      alertCount,
+      emergencyTriggered: hasEmergency,
       safeWindows: currentWindows,
       route: routeSamples.current.length ? routeSamples.current.slice() : undefined,
     };
@@ -972,6 +1058,7 @@ export function TripProvider({ children }: PropsWithChildren) {
       lastEventLabel,
       lastCompletedTrip,
       dismissCompletedTrip,
+      reloadUserSession,
     }),
     [
       acknowledgeOk,
@@ -985,6 +1072,7 @@ export function TripProvider({ children }: PropsWithChildren) {
       hydrated,
       permissionGranted,
       refreshPermission,
+      reloadUserSession,
       sessionId,
       settings,
       speedKmh,

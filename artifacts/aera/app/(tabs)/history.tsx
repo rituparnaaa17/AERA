@@ -53,26 +53,12 @@ const startOfDay = (d: Date) => {
   const c = new Date(d); c.setHours(0, 0, 0, 0);
   return c.getTime();
 };
-const tripKind = (t: Trip): 'safe' | 'alert' | 'emergency' =>
-  t.emergencyTriggered ? 'emergency' : t.hadAlert ? 'alert' : 'safe';
+import { getTripKind, calculateTripScore } from '@/utils/tripUtils';
+
+const tripKind = (t: Trip) => getTripKind(t);
 const kindColor = (k: 'safe' | 'alert' | 'emergency') =>
   k === 'emergency' ? DANGER : k === 'alert' ? WARN : SAFE;
-// Trip safety score — MUST match `calculateScore` in app/summary.tsx.
-// Real state only (alertCount, hadAlert, emergencyTriggered from the
-// persisted Trip record). No random / hardcoded per-trip values.
-const tripScore = (t: Trip): number => {
-  const alertCount = t.alertCount ?? t.events.filter((e) => e.status === 'ALERT').length;
-
-  if (t.emergencyTriggered) {
-    const penalty = Math.min(55, alertCount * 12 + 25);
-    return Math.max(42, Math.round(100 - penalty));
-  }
-  if (t.hadAlert || alertCount > 0) {
-    const penalty = Math.min(25, alertCount * 8);
-    return Math.max(72, Math.round(98 - penalty));
-  }
-  return 98;
-};
+const tripScore = (t: Trip): number => calculateTripScore(t);
 const tripTitle = (t: Trip) => {
   const h = new Date(t.startedAt).getHours();
   if (h < 12) return 'Morning Trip';
@@ -302,7 +288,7 @@ function TripDetail({
   const score = tripScore(trip);
   const durationMin = Math.floor(trip.duration / 60);
   const alertsCount = trip.alertCount ?? trip.events.filter((e) => e.status === 'ALERT').length;
-  const emergencyCount = trip.emergencyTriggered ? 1 : 0;
+  const emergencyCount = kind === 'emergency' ? 1 : 0;
 
   return (
     <AppBackground fadeStrength="default">

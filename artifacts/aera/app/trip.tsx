@@ -30,6 +30,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '@/components/AppBackground';
 import { Mascot } from '@/components/Mascot';
+import { PrimaryButton } from '@/components/PrimaryButton';
 import { SensorGrid } from '@/components/SensorTiles';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import { useTrip } from '@/components/TripContext';
@@ -183,6 +184,19 @@ export default function LiveTripScreen() {
           </View>
           <Feather name="chevron-right" size={18} color="#94A3B8" />
         </Pressable>
+
+        {/* ── End Trip CTA Card ── */}
+        <View style={styles.endTripCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.endTripTitle}>Reached your destination?</Text>
+            <Text style={styles.endTripSub}>Stop safety monitoring and view your drive summary.</Text>
+          </View>
+          <PrimaryButton
+            label="End Trip Safely"
+            onPress={endTripConfirm}
+            style={styles.endTripBtn}
+          />
+        </View>
 
         {/* ── Sensor Health ── */}
         <Text style={styles.sectionTitle}>Sensor Health</Text>
@@ -351,4 +365,21 @@ const styles = StyleSheet.create({
   },
   aiLinkTitle: { color: NAVY, fontSize: 14, fontWeight: '800' },
   aiLinkSub: { color: NAVY_SOFT, fontSize: 12, marginTop: 2 },
+
+  endTripCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#2563EB33',
+    borderRadius: 22,
+    padding: 16,
+    gap: 12,
+    shadowColor: NAVY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  endTripTitle: { color: NAVY, fontSize: 16, fontWeight: '800' },
+  endTripSub: { color: NAVY_SOFT, fontSize: 13, marginTop: 2 },
+  endTripBtn: { backgroundColor: NAVY, height: 50 },
 });

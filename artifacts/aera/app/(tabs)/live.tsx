@@ -27,6 +27,7 @@ export default function LiveTabScreen() {
     elapsedSeconds,
     distanceKm,
     startTrip,
+    stopTrip,
     windowsProcessed,
     settings,
     networkAvailable,
@@ -145,14 +146,34 @@ export default function LiveTabScreen() {
               </View>
             </View>
 
-            {/* Open full view button */}
-            <PrimaryButton
-              icon="maximize-2"
-              onPress={() => router.push('/trip')}
-              variant="secondary"
-            >
-              Open Full Monitoring View
-            </PrimaryButton>
+            {/* Action buttons: Full View & End Trip */}
+            <View style={{ gap: 10, marginTop: 4 }}>
+              <PrimaryButton
+                icon="maximize-2"
+                onPress={() => router.push('/trip')}
+                variant="secondary"
+              >
+                Open Full Monitoring View
+              </PrimaryButton>
+              <PrimaryButton
+                icon="check-circle"
+                onPress={() => {
+                  Alert.alert('End Trip?', 'Your trip will be saved to history.', [
+                    { text: 'Keep driving', style: 'cancel' },
+                    {
+                      text: 'End trip',
+                      style: 'destructive',
+                      onPress: async () => {
+                        await stopTrip();
+                        router.replace('/summary');
+                      },
+                    },
+                  ]);
+                }}
+              >
+                End Trip Safely
+              </PrimaryButton>
+            </View>
           </GlassCard>
 
           {/* Sensor health */}

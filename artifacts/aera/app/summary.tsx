@@ -27,6 +27,7 @@ import { Mascot } from '@/components/Mascot';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { QSafetyHalo } from '@/components/QSafetyHalo';
 import { useTrip, type Trip } from '@/components/TripContext';
+import { getTripKind, calculateTripScore } from '@/utils/tripUtils';
 
 const NAVY = '#0F1E4A';
 const NAVY_SOFT = '#334155';
@@ -50,25 +51,10 @@ export default function TripCompleteScreen() {
   const alerts = lastCompletedTrip
     ? lastCompletedTrip.alertCount ?? lastCompletedTrip.events.filter((e) => e.status === 'ALERT').length
     : 0;
-  const emergencies = lastCompletedTrip?.emergencyTriggered ? 1 : 0;
-
-  // Dynamically calculate Trip Safety Rating (0-100) from telemetry & window telemetry
-  const calculateScore = (trip: Trip | null): number => {
-    if (!trip) return 100;
-    const alertCount = trip.alertCount ?? trip.events.filter((e) => e.status === 'ALERT').length;
-    
-    if (trip.emergencyTriggered) {
-      const penalty = Math.min(55, alertCount * 12 + 25);
-      return Math.max(42, Math.round(100 - penalty));
-    }
-    if (trip.hadAlert || alertCount > 0) {
-      const penalty = Math.min(25, alertCount * 8);
-      return Math.max(72, Math.round(98 - penalty));
-    }
-    return 98;
-  };
-
-  const score = calculateScore(lastCompletedTrip);
+  const tripKind = lastCompletedTrip ? getTripKind(lastCompletedTrip) : 'safe';
+  const isEmergency = tripKind === 'emergency';
+  const emergencies = isEmergency ? 1 : 0;
+  const score = lastCompletedTrip ? calculateTripScore(lastCompletedTrip) : 100;
 
   const scoreColor = score >= 90 ? SAFE : score >= 70 ? WARN : DANGER;
   const scoreLabel = score >= 90 ? 'Excellent' : score >= 70 ? 'Good' : 'Needs Review';
@@ -85,7 +71,7 @@ export default function TripCompleteScreen() {
   if (!lastCompletedTrip) return null;
 
   const durationMin = Math.floor(lastCompletedTrip.duration / 60);
-  const mascotPose = lastCompletedTrip.emergencyTriggered ? 'heart' : 'celebrate';
+  const mascotPose = isEmergency ? 'heart' : 'celebrate';
 
   return (
     <AppBackground fadeStrength="default">
@@ -101,7 +87,7 @@ export default function TripCompleteScreen() {
           <Mascot size={140} pose={mascotPose} />
           <Text style={styles.eyebrow}>TRIP COMPLETE</Text>
           <Text style={styles.title}>
-            {lastCompletedTrip.emergencyTriggered ? 'Take care of yourself.' : 'You drove safely.'}
+            {isEmergency ? 'Take care of yourself.' : 'You drove safely.'}
           </Text>
           <Text style={styles.sub}>Your monitored drive has been saved to trip history.</Text>
         </View>
@@ -120,7 +106,7 @@ export default function TripCompleteScreen() {
             captionColor={NAVY_SOFT}
           />
           <Text style={styles.scoreNote}>
-            {lastCompletedTrip.emergencyTriggered
+            {isEmergency
               ? 'Emergency was triggered during this trip.'
               : alerts > 0
               ? 'Potential risks were detected but no emergency was needed.'

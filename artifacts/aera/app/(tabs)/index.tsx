@@ -30,6 +30,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { QSafetyHalo } from '@/components/QSafetyHalo';
 import { useTrip } from '@/components/TripContext';
 import { getCurrentSession, signOut } from '@/services/authService';
+import { getTripKind } from '@/utils/tripUtils';
 
 const NAVY = '#0F1E4A';
 const NAVY_SOFT = '#334155';
@@ -77,6 +78,8 @@ export default function HomeDashboard() {
     tripActive,
     trips,
     startTrip,
+    stopTrip,
+    reloadUserSession,
     hydrated,
     lastEventLabel,
   } = useTrip();
@@ -93,21 +96,32 @@ export default function HomeDashboard() {
   }, []);
   const firstName = (userName ?? '').trim().split(/\s+/)[0] || 'Driver';
 
-  // Real derived metrics
-  const safeTrips = trips.filter((t) => !t.hadAlert).length;
+  // Real derived metrics — NO fabricated 60 score floor
+  const hasSafetyData = trips.length > 0;
+  const safeTrips = trips.filter((t) => !t.hadAlert && !t.emergencyTriggered).length;
   const totalAlerts = trips.reduce((s, t) => s + (t.alertCount ?? 0), 0);
-  const safetyScore = trips.length
-    ? Math.max(60, Math.round((safeTrips / trips.length) * 100))
-    : 100;
+  const safetyScore = hasSafetyData
+    ? Math.round((safeTrips / trips.length) * 100)
+    : null;
   const lastTrip = trips[0];
 
-  const stateColor = isEmergency ? DANGER : isAlert ? WARN : SAFE;
-  const stateHeadline = isEmergency ? 'Emergency active' : isAlert ? 'Check in required' : "You're safe";
+  const stateColor = isEmergency ? DANGER : isAlert ? WARN : hasSafetyData ? SAFE : BRAND_BLUE;
+  const stateHeadline = isEmergency
+    ? 'Emergency active'
+    : isAlert
+    ? 'Check in required'
+    : tripActive
+    ? "You're safe"
+    : hasSafetyData
+    ? "You're safe"
+    : 'No safety data yet';
   const stateNote = tripActive
     ? lastEventLabel || 'Monitoring your journey'
     : isEmergency || isAlert
     ? lastEventLabel || 'Awaiting your response'
-    : 'All systems active';
+    : hasSafetyData
+    ? 'All systems active'
+    : 'Start your first drive to calculate safety score';
 
   const mascotPose: MascotPose = isEmergency
     ? 'emergency'
@@ -126,8 +140,9 @@ export default function HomeDashboard() {
         onPress: async () => {
           try {
             await signOut();
+            await reloadUserSession();
           } catch {
-            // signOut just clears local keys — if it throws we still leave.
+            // signOut clears tokens
           }
           router.replace('/(auth)/login');
         },
@@ -187,12 +202,12 @@ export default function HomeDashboard() {
 
             <View style={{ marginTop: 8 }}>
               <QSafetyHalo
-                value={safetyScore}
+                value={hasSafetyData ? (safetyScore ?? 100) : 0}
                 size={110}
                 stroke={6}
                 color={stateColor}
-                centerLabel={`${safetyScore}`}
-                centerCaption="SAFETY"
+                centerLabel={hasSafetyData ? `${safetyScore}` : '—'}
+                centerCaption={hasSafetyData ? 'SAFETY' : 'NO DATA'}
                 centerColor={NAVY}
                 captionColor={MUTED}
               />
@@ -228,56 +243,78 @@ export default function HomeDashboard() {
         </View>
 
         {/* ── Primary CTA ── */}
-        <PrimaryButton
-          label={tripActive ? 'Open Live Trip' : 'Start a Trip'}
-          onPress={async () => {
-            if (tripActive) { router.push('/trip'); return; }
-            const started = await startTrip();
-            if (started) router.push('/trip');
-          }}
-          disabled={!hydrated}
-          style={styles.ctaBtn}
-          testID="trip-toggle"
-        />
+        {!tripActive ? (
+          <PrimaryButton
+            label="Start a Trip"
+            onPress={async () => {
+              const started = await startTrip();
+              if (started) router.push('/trip');
+            }}
+            disabled={!hydrated}
+            style={styles.ctaBtn}
+            testID="trip-toggle"
+          />
+        ) : (
+          <View style={{ gap: 10 }}>
+            <PrimaryButton
+              label="Open Live Trip"
+              onPress={() => router.push('/trip')}
+              disabled={!hydrated}
+              style={styles.ctaBtn}
+              testID="trip-toggle"
+            />
+            <PrimaryButton
+              label="End Trip Safely"
+              onPress={() => {
+                Alert.alert('End Trip?', 'Your trip will be saved to history.', [
+                  { text: 'Keep driving', style: 'cancel' },
+                  {
+                    text: 'End trip',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await stopTrip();
+                      router.replace('/summary');
+                    },
+                  },
+                ]);
+              }}
+              disabled={!hydrated}
+            />
+          </View>
+        )}
 
         {/* ── Last Trip (only when a trip exists) ── */}
-        {lastTrip && (
-          <Pressable
-            onPress={() => router.push(`/(tabs)/history?open=${encodeURIComponent(lastTrip.id)}`)}
-            style={styles.lastTripRow}
-            accessibilityLabel="Open last trip details"
-          >
-            <View style={[styles.lastTripBadge, {
-              backgroundColor:
-                lastTrip.emergencyTriggered ? DANGER + '18'
-                : lastTrip.hadAlert ? WARN + '18'
-                : SAFE + '18',
-            }]}>
-              <Feather
-                name={
-                  lastTrip.emergencyTriggered ? 'alert-octagon'
-                  : lastTrip.hadAlert ? 'alert-triangle'
-                  : 'check-circle'
-                }
-                size={16}
-                color={lastTrip.emergencyTriggered ? DANGER : lastTrip.hadAlert ? WARN : SAFE}
-              />
-            </View>
-            <View style={styles.lastTripLeft}>
-              <Text style={styles.lastTripEyebrow}>LAST TRIP</Text>
-              <Text style={styles.lastTripTitle}>
-                {lastTrip.emergencyTriggered ? 'Emergency' : lastTrip.hadAlert ? 'Alerted' : 'Safe'}
-                {' · '}{lastTrip.distance.toFixed(1)} km · {formatDuration(lastTrip.duration)}
-              </Text>
-              <Text style={styles.lastTripMeta}>
-                {new Date(lastTrip.endedAt).toLocaleString([], {
-                  month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                })}
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={MUTED} />
-          </Pressable>
-        )}
+        {lastTrip && (() => {
+          const lastKind = getTripKind(lastTrip);
+          const badgeBg = lastKind === 'emergency' ? DANGER + '18' : lastKind === 'alert' ? WARN + '18' : SAFE + '18';
+          const badgeIcon = lastKind === 'emergency' ? 'alert-octagon' : lastKind === 'alert' ? 'alert-triangle' : 'check-circle';
+          const badgeColor = lastKind === 'emergency' ? DANGER : lastKind === 'alert' ? WARN : SAFE;
+          const badgeTitle = lastKind === 'emergency' ? 'Emergency' : lastKind === 'alert' ? 'Alerted' : 'Safe';
+
+          return (
+            <Pressable
+              onPress={() => router.push(`/(tabs)/history?open=${encodeURIComponent(lastTrip.id)}`)}
+              style={styles.lastTripRow}
+              accessibilityLabel="Open last trip details"
+            >
+              <View style={[styles.lastTripBadge, { backgroundColor: badgeBg }]}>
+                <Feather name={badgeIcon} size={16} color={badgeColor} />
+              </View>
+              <View style={styles.lastTripLeft}>
+                <Text style={styles.lastTripEyebrow}>LAST TRIP</Text>
+                <Text style={styles.lastTripTitle}>
+                  {badgeTitle}{' · '}{lastTrip.distance.toFixed(1)} km · {formatDuration(lastTrip.duration)}
+                </Text>
+                <Text style={styles.lastTripMeta}>
+                  {new Date(lastTrip.endedAt).toLocaleString([], {
+                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={MUTED} />
+            </Pressable>
+          );
+        })()}
 
         {/* ── Q Safety Byte — permanent rotating tip. Local content only;
              does not depend on trips, network, or backend. ── */}
