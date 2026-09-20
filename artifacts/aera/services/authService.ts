@@ -75,31 +75,46 @@ export interface SignUpParams {
 }
 
 /**
+ * Resolves any user identifier (email or phone) to a Cognito-compliant username.
+ */
+export function resolveCognitoUsername(identifier: string): string {
+  const trimmed = identifier.trim();
+  // Check if identifier is a phone number (starts with + or contains digits)
+  if (trimmed.startsWith('+') || /^\+?\d[\d\s\-\(\)]{7,}$/.test(trimmed)) {
+    const e164 = normalizePhoneNumber(trimmed);
+    const digits = e164.replace(/\D/g, '');
+    return `${digits}@phone.aera.app`;
+  }
+  return trimmed.toLowerCase();
+}
+
+/**
  * Sign up a new user using EITHER email OR phone number verification.
  * The user verifies ONLY ONE contact method via Cognito OTP.
  */
 export async function signUp(params: SignUpParams): Promise<{ nextStep: 'CONFIRM_SIGN_UP' }> {
   const { name, password, verificationMethod, email, phone } = params;
 
-  let username = '';
+  let cognitoUsername = '';
   const userAttributes: Array<{ Name: string; Value: string }> = [
     { Name: 'name', Value: name.trim() },
   ];
 
   if (verificationMethod === 'email') {
     if (!email?.trim()) throw { code: 'InvalidParameterException', message: 'Email address is required.' } as AuthError;
-    username = email.trim().toLowerCase();
-    userAttributes.push({ Name: 'email', Value: username });
+    cognitoUsername = email.trim().toLowerCase();
+    userAttributes.push({ Name: 'email', Value: cognitoUsername });
   } else {
     if (!phone?.trim()) throw { code: 'InvalidParameterException', message: 'Phone number is required.' } as AuthError;
-    // Normalize phone number to E.164 format
-    username = normalizePhoneNumber(phone.trim());
-    userAttributes.push({ Name: 'phone_number', Value: username });
+    const formattedPhone = normalizePhoneNumber(phone.trim());
+    cognitoUsername = resolveCognitoUsername(formattedPhone);
+    userAttributes.push({ Name: 'phone_number', Value: formattedPhone });
+    userAttributes.push({ Name: 'email', Value: cognitoUsername });
   }
 
   await cognitoRequest('AWSCognitoIdentityProviderService.SignUp', {
     ClientId: CLIENT_ID,
-    Username: username,
+    Username: cognitoUsername,
     Password: password,
     UserAttributes: userAttributes,
   });
@@ -110,11 +125,11 @@ export async function signUp(params: SignUpParams): Promise<{ nextStep: 'CONFIRM
 /**
  * Confirm verification code (email OTP or SMS OTP) sent after signUp.
  */
-export async function confirmSignUp(username: string, code: string): Promise<void> {
-  const normalizedUsername = username.startsWith('+') ? username : username.trim().toLowerCase();
+export async function confirmSignUp(identifier: string, code: string): Promise<void> {
+  const cognitoUsername = resolveCognitoUsername(identifier);
   await cognitoRequest('AWSCognitoIdentityProviderService.ConfirmSignUp', {
     ClientId: CLIENT_ID,
-    Username: normalizedUsername,
+    Username: cognitoUsername,
     ConfirmationCode: code.trim(),
   });
 }
@@ -122,11 +137,11 @@ export async function confirmSignUp(username: string, code: string): Promise<voi
 /**
  * Resend verification code to user's selected contact method (email or phone).
  */
-export async function resendConfirmationCode(username: string): Promise<void> {
-  const normalizedUsername = username.startsWith('+') ? username : username.trim().toLowerCase();
+export async function resendConfirmationCode(identifier: string): Promise<void> {
+  const cognitoUsername = resolveCognitoUsername(identifier);
   await cognitoRequest('AWSCognitoIdentityProviderService.ResendConfirmationCode', {
     ClientId: CLIENT_ID,
-    Username: normalizedUsername,
+    Username: cognitoUsername,
   });
 }
 
@@ -135,15 +150,13 @@ export async function resendConfirmationCode(username: string): Promise<void> {
  * Stores tokens in AsyncStorage.
  */
 export async function signIn(identifier: string, password: string): Promise<AuthSession> {
-  const normalizedUsername = identifier.startsWith('+')
-    ? identifier.trim()
-    : identifier.trim().toLowerCase();
+  const cognitoUsername = resolveCognitoUsername(identifier);
 
   const data = await cognitoRequest('AWSCognitoIdentityProviderService.InitiateAuth', {
     AuthFlow: 'USER_PASSWORD_AUTH',
     ClientId: CLIENT_ID,
     AuthParameters: {
-      USERNAME: normalizedUsername,
+      USERNAME: cognitoUsername,
       PASSWORD: password,
     },
   });
@@ -161,7 +174,7 @@ export async function signIn(identifier: string, password: string): Promise<Auth
     accessToken: result['AccessToken'] ?? '',
     refreshToken: result['RefreshToken'] ?? '',
     userId,
-    email: normalizedUsername,
+    email: identifier.trim(),
   };
 
   await storeSession(session);
